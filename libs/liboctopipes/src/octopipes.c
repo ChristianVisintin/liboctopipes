@@ -302,20 +302,75 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
   if (message == NULL) {
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
+  //Fill message structure
+  message->origin = client->client_id;
+  message->origin_size = client->client_id_size;
+  message->remote = remote;
+  message->remote_size = strlen(remote);
+  message->options = options;
+  message->ttl = ttl;
+  message->data = data;
+  message->data_size = data_size;
+  //Encode message
+  size_t out_data_size;
+  uint8_t* out_data = octopipes_encode(message, &out_data_size);
   free(message);
+  //Write to FIFO
+  OctopipesError rc = fifo_send(client->tx_pipe, out_data, out_data_size);
+  free(out_data);
+  return rc;
 }
+
+/**
+ * @brief set the function to call when a message is received by the octopipes client
+ * @param OctopipesClient*
+ * @param function
+ * @return OctopipesError
+ */
 
 OctopipesError octopipes_set_received_cb(OctopipesClient* client, void (*on_received)(const OctopipesMessage*)) {
-
+  if (client == NULL) {
+    return OCTOPIPES_ERROR_UNINITIALIZED;
+  }
+  client->on_received = on_received;
+  return OCTOPIPES_ERROR_SUCCESS; 
 }
+
+/**
+ * @brief set the function to call when the client subscribe to the server
+ * @param OctopipesClient*
+ * @param function
+ * @return OctopipesError
+ */
 
 OctopipesError octopipes_set_subscribed_cb(OctopipesClient* client, void (*on_subscribed)()) {
-
+  if (client == NULL) {
+    return OCTOPIPES_ERROR_UNINITIALIZED;
+  }
+  client->on_subscribed = on_subscribed;
+  return OCTOPIPES_ERROR_SUCCESS;
 }
+
+/**
+ * @brief set the function to call when the client unsubscribe from the server
+ * @param OctopipesClient*
+ * @param function
+ * @return OctopipesError
+ */
 
 OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_unsubscribed)()) {
-
+  if (client == NULL) {
+    return OCTOPIPES_ERROR_UNINITIALIZED;
+  }
+  client->on_unsubscribed = on_unsubscribed;
+  return OCTOPIPES_ERROR_SUCCESS;
 }
+
+/**
+ * @brief get error description from the provided error code
+ * @param OctopipesError
+ * @return const char*
+ */
 
 const char* octopipes_get_error_desc(const OctopipesError error) {
   
