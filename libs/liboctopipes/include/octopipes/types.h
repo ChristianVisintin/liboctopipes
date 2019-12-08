@@ -31,11 +31,14 @@
 typedef enum OctopipesError {
   OCTOPIPES_ERROR_SUCCESS,
   OCTOPIPES_ERROR_UNINITIALIZED,
-  OCTOPIPES_ERROR_THREAD,
+  OCTOPIPES_ERROR_BAD_PACKET,
+  OCTOPIPES_ERROR_BAD_CHECKSUM,
+  OCTOPIPES_ERROR_UNSUPPORTED_VERSION,
   OCTOPIPES_ERROR_WRITE_FAILED,
   OCTOPIPES_ERROR_READ_FAILED,
   OCTOPIPES_ERROR_NOT_SUBSCRIBED,
   OCTOPIPES_ERROR_NOT_UNSUBSCRIBED,
+  OCTOPIPES_ERROR_THREAD,
   OCTOPIPES_ERROR_BAD_ALLOC,
   OCTOPIPES_ERROR_UNKNOWN_ERROR
 } OctopipesError;
@@ -80,6 +83,7 @@ typedef struct OctopipesClient {
   //Client parameters
   size_t client_id_size;
   char* client_id;
+  OctopipesVersion protocol_version;
   //Pipes paths
   char* common_access_pipe;
   char* tx_pipe;

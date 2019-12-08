@@ -34,7 +34,7 @@ extern "C" {
 
 //Functions
 //Alloc operations
-OctopipesError octopipes_init(OctopipesClient** client, const char* client_id, const char* cap_path);
+OctopipesError octopipes_init(OctopipesClient** client, const char* client_id, const char* cap_path, const OctopipesVersion version_to_use);
 OctopipesError octopipes_cleanup(OctopipesClient* client);
 //Thread operations
 OctopipesError octopipes_loop_start(OctopipesClient* client);

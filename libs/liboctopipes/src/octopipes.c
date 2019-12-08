@@ -26,14 +26,19 @@
 
 #include <string.h>
 
+#define SOH 0x01
+#define STX 0x02
+#define ETX 0x03
+
 #define DEFAULT_TTL 255
 
 //Private properties and functions
 //Threads
 void octopipes_loop(OctopipesClient* client);
 //Encoding/decoding
-OctopipesMessage* octopipes_decode(const uint8_t* data, const size_t data_size);
-uint8_t* octopipes_encode(const OctopipesMessage* message, size_t* data_size);
+OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, OctopipesMessage** message);
+uint8_t* octopipes_encode(OctopipesMessage* message, size_t* data_size);
+uint8_t calculate_checksum(const OctopipesMessage* message);
 //I/O
 OctopipesError fifo_receive(const char* fifo, uint8_t** data, size_t* data_size);
 OctopipesError fifo_send(const char* fifo, const uint8_t* data, const size_t data_size);
@@ -43,12 +48,13 @@ OctopipesError fifo_send(const char* fifo, const uint8_t* data, const size_t dat
  * @param OctopipesClient
  * @param char* client id
  * @param char* common access pipe path
+ * @param OctopipesVersion verso to use to communicate
  * @return OctopipesError
  */
 
-OctopipesError octopipes_init(OctopipesClient** client, const char* client_id, const char* cap_path) {
+OctopipesError octopipes_init(OctopipesClient** client, const char* client_id, const char* cap_path, const OctopipesVersion version) {
   *client = (OctopipesClient*) malloc(sizeof(OctopipesClient));
-  if (client == NULL) {
+  if (*client == NULL) {
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
   (*client)->client_id_size = strlen(client_id);
@@ -65,6 +71,7 @@ OctopipesError octopipes_init(OctopipesClient** client, const char* client_id, c
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
   strcpy((*client)->common_access_pipe, cap_path);
+  (*client)->protocol_version = version;
   (*client)->rx_pipe = NULL;
   (*client)->tx_pipe = NULL;
   (*client)->state = OCTOPIPES_STATE_INIT;
@@ -162,6 +169,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
   //Set origin as client
+  subscribe_message->version = client->protocol_version;
   subscribe_message->origin_size = client->client_id_size;
   subscribe_message->origin = client->client_id;
   //Server is 0
@@ -229,6 +237,7 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
   //Set origin as client
+  subscribe_message->version = client->protocol_version;
   subscribe_message->origin_size = client->client_id_size;
   subscribe_message->origin = client->client_id;
   //Server is 0
@@ -303,6 +312,7 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
   //Fill message structure
+  message->version = client->protocol_version;
   message->origin = client->client_id;
   message->origin_size = client->client_id_size;
   message->remote = remote;
@@ -374,4 +384,166 @@ OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_
 
 const char* octopipes_get_error_desc(const OctopipesError error) {
   
+}
+
+//Internal functions
+
+/**
+ * @brief thread loop functions for octopipes client daemon thread
+ * @param OctopipesClient*
+ */
+
+void octopipes_loop(OctopipesClient* client) {
+
+}
+
+/**
+ * @brief decode an octopipe message
+ * @param uint8_t* data read from FIFO
+ * @param size_t data size
+ * @param OctopipesMessage**
+ * @return OctopipesError
+ */
+
+OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, OctopipesMessage** message) {
+  (*message) = (OctopipesMessage*) malloc(sizeof(OctopipesMessage));
+  size_t current_minimum_size = 17; //Minimum packet size counting static sizes
+  size_t data_ptr = 0;
+  OctopipesMessage* message_ptr = *message;
+  if (message_ptr == NULL) {
+    return OCTOPIPES_ERROR_BAD_ALLOC;
+  }
+  message_ptr->data = NULL;
+  message_ptr->origin = NULL;
+  message_ptr->remote = NULL;
+  if (data_size < current_minimum_size) { //Minimum packet size
+    goto decode_bad_packet;
+  }
+  if (data[0] != SOH || data[data_size - 1] != ETX) { //Check first and last byte
+    goto decode_bad_packet;
+  }
+  message_ptr->version = (OctopipesVersion) data[1];
+  if (message_ptr->version == OCTOPIPES_VERSION_1) { //Octopipes version 1
+    //Origin and remote
+    message_ptr->origin_size = data[2];
+    current_minimum_size += message_ptr->origin_size;
+    //Check size for origin
+    if (data_size < current_minimum_size) {
+      goto decode_bad_packet;
+    }
+    //Allocate origin size
+    data_ptr = 3; //next position after SOH + VERSION + LNS
+    message_ptr->origin = (char*) malloc(sizeof(char) * message_ptr->origin_size + 1); //+1 null terminator
+    if (message_ptr->origin == NULL) {
+      goto decode_bad_alloc;
+    }
+    memcpy(message_ptr->origin, data + data_ptr, message_ptr->origin_size);
+    message_ptr->origin[message_ptr->origin_size] = 0x00;
+    data_ptr += message_ptr->origin_size;
+    //Remote
+    message_ptr->remote_size = data[data_ptr];
+    current_minimum_size += message_ptr->remote_size;
+    if (data_size < current_minimum_size) {
+      goto decode_bad_packet;
+    }
+    data_ptr++;
+    message_ptr->remote = (char*) malloc(sizeof(char) * message_ptr->remote_size + 1);
+    if (message_ptr->remote == NULL) {
+      goto decode_bad_alloc;
+    }
+    memcpy(message_ptr->remote, data + data_ptr, message_ptr->remote_size);
+    message_ptr->remote[message_ptr->remote_size] = 0x00;
+    data_ptr += message_ptr->remote_size;
+    //TTL
+    message_ptr->ttl = data[data_ptr++];
+    //Data size
+    message_ptr->data_size = data[data_ptr++]; // 0
+    message_ptr->data_size = message_ptr->data_size << 8;
+    message_ptr->data_size += data[data_ptr++]; // 1
+    message_ptr->data_size = message_ptr->data_size << 8;
+    message_ptr->data_size += data[data_ptr++]; // 2
+    message_ptr->data_size = message_ptr->data_size << 8;
+    message_ptr->data_size += data[data_ptr++]; // 3
+    message_ptr->data_size = message_ptr->data_size << 8;
+    message_ptr->data_size += data[data_ptr++]; // 4
+    message_ptr->data_size = message_ptr->data_size << 8;
+    message_ptr->data_size += data[data_ptr++]; // 5
+    message_ptr->data_size = message_ptr->data_size << 8;
+    message_ptr->data_size += data[data_ptr++]; // 6
+    message_ptr->data_size = message_ptr->data_size << 8;
+    message_ptr->data_size += data[data_ptr++]; // 7
+    //Options
+    message_ptr->options = data[data_ptr++];
+    //Checksum
+    message_ptr->checksum = data[data_ptr++];
+    //Verify STX
+    if (data[data_ptr] != STX) {
+      goto decode_bad_packet;
+    }
+    //Read data
+    current_minimum_size += message_ptr->data_size;
+    if (data_size < message_ptr->data_size) {
+      goto decode_bad_packet;
+    }
+    if (message_ptr->data_size > 0) {
+      message_ptr->data = (uint8_t*) malloc(sizeof(uint8_t) * message_ptr->data_size);
+      if (message_ptr->data == NULL) {
+        goto decode_bad_alloc;
+      }
+      memcpy(message_ptr->data, data + data_ptr, message_ptr->data_size);
+    }
+    //Verify checksum if required
+    if (message_ptr->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM == 0) {
+      uint8_t verification_checksum = calculate_checksum(message_ptr);
+    }
+  } else { //Unsupported protocol version
+    free(message_ptr);
+    return OCTOPIPES_ERROR_UNSUPPORTED_VERSION;
+  }
+  return OCTOPIPES_ERROR_SUCCESS;
+
+decode_bad_packet:
+  if (message_ptr->origin != NULL) {
+    free(message_ptr->origin);
+  }
+  if (message_ptr->remote != NULL) {
+    free(message_ptr->remote);
+  }
+  if (message_ptr->data != NULL) {
+    free(message_ptr->data);
+  }
+  free(message_ptr);
+  return OCTOPIPES_ERROR_BAD_PACKET;
+
+decode_bad_alloc:
+  if (message_ptr->origin != NULL) {
+    free(message_ptr->origin);
+  }
+  if (message_ptr->remote != NULL) {
+    free(message_ptr->remote);
+  }
+  if (message_ptr->data != NULL) {
+    free(message_ptr->data);
+  }
+  free(message_ptr);
+  return OCTOPIPES_ERROR_BAD_ALLOC;
+}
+
+/**
+ * @brief encode an OctopipeMessage structure into the buffer to write to the FIFO
+ * @param OctopipesMessage* message structure
+ * @param size_t* data size of out buffer
+ * @return uint8_t*
+ */
+
+uint8_t* octopipes_encode(OctopipesMessage* message, size_t* data_size) {
+
+}
+
+OctopipesError fifo_receive(const char* fifo, uint8_t** data, size_t* data_size) {
+
+}
+
+OctopipesError fifo_send(const char* fifo, const uint8_t* data, const size_t data_size) {
+
 }
