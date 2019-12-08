@@ -37,7 +37,7 @@
 void octopipes_loop(OctopipesClient* client);
 //Encoding/decoding
 OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, OctopipesMessage** message);
-uint8_t* octopipes_encode(OctopipesMessage* message, size_t* data_size);
+OctopipesError octopipes_encode(OctopipesMessage* message, uint8_t** data, size_t* data_size);
 uint8_t calculate_checksum(const OctopipesMessage* message);
 //I/O
 OctopipesError fifo_receive(const char* fifo, uint8_t** data, size_t* data_size);
@@ -186,16 +186,16 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   }
   //Encode message
   size_t out_data_size;
-  uint8_t* out_data = octopipes_encode(subscribe_message, out_data_size);
-  if (out_data == NULL) {
-    free(subscribe_message->data);
-    free(subscribe_message);
-  }
-  //Send packet
-  OctopipesError rc = fifo_send(client->common_access_pipe, out_data, out_data_size);
-  free(out_data);
+  uint8_t* out_data;
+  OctopipesError rc = octopipes_encode(subscribe_message, &out_data, out_data_size);
   free(subscribe_message->data);
   free(subscribe_message);
+  if (rc != OCTOPIPES_ERROR_SUCCESS) {
+    return rc;
+  }
+  //Send packet
+  rc = fifo_send(client->common_access_pipe, out_data, out_data_size);
+  free(out_data);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
   }
@@ -254,16 +254,16 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   }
   //Encode message
   size_t out_data_size;
-  uint8_t* out_data = octopipes_encode(subscribe_message, out_data_size);
-  if (out_data == NULL) {
-    free(subscribe_message->data);
-    free(subscribe_message);
-  }
-  //Send packet
-  OctopipesError rc = fifo_send(client->common_access_pipe, out_data, out_data_size);
-  free(out_data);
+  uint8_t* out_data;
+  OctopipesError rc = octopipes_encode(subscribe_message, &out_data, &out_data_size);
   free(subscribe_message->data);
   free(subscribe_message);
+  if (rc != OCTOPIPES_ERROR_SUCCESS) {
+    return rc;
+  }
+  //Send packet
+  rc = fifo_send(client->common_access_pipe, out_data, out_data_size);
+  free(out_data);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
   }
@@ -323,10 +323,14 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
   message->data_size = data_size;
   //Encode message
   size_t out_data_size;
-  uint8_t* out_data = octopipes_encode(message, &out_data_size);
+  uint8_t* out_data;
+  OctopipesError rc = octopipes_encode(message, &out_data, &out_data_size);
   free(message);
+  if (rc != OCTOPIPES_ERROR_SUCCESS) {
+    return rc;
+  }
   //Write to FIFO
-  OctopipesError rc = fifo_send(client->tx_pipe, out_data, out_data_size);
+  rc = fifo_send(client->tx_pipe, out_data, out_data_size);
   free(out_data);
   return rc;
 }
@@ -493,9 +497,13 @@ OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, Oct
       memcpy(message_ptr->data, data + data_ptr, message_ptr->data_size);
     }
     //Verify checksum if required
-    if (message_ptr->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM == 0) {
+    if (message_ptr->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM != 0) {
       uint8_t verification_checksum = calculate_checksum(message_ptr);
+      if (verification_checksum != message_ptr->checksum) {
+        goto decode_bad_checksum;
+      }
     }
+    //@! Decoding OK
   } else { //Unsupported protocol version
     free(message_ptr);
     return OCTOPIPES_ERROR_UNSUPPORTED_VERSION;
@@ -527,6 +535,19 @@ decode_bad_alloc:
   }
   free(message_ptr);
   return OCTOPIPES_ERROR_BAD_ALLOC;
+
+decode_bad_checksum:
+  if (message_ptr->origin != NULL) {
+    free(message_ptr->origin);
+  }
+  if (message_ptr->remote != NULL) {
+    free(message_ptr->remote);
+  }
+  if (message_ptr->data != NULL) {
+    free(message_ptr->data);
+  }
+  free(message_ptr);
+  return OCTOPIPES_ERROR_BAD_CHECKSUM;
 }
 
 /**
@@ -536,8 +557,76 @@ decode_bad_alloc:
  * @return uint8_t*
  */
 
-uint8_t* octopipes_encode(OctopipesMessage* message, size_t* data_size) {
+OctopipesError octopipes_encode(OctopipesMessage* message, uint8_t** data, size_t* data_size) {
+  //Prepare encoding
+  uint8_t* out_data;
+  if (message->version == OCTOPIPES_VERSION_1) {
+    //Calculate required size
+    *data_size = 17; //Minimum size
+    *data_size += message->remote_size;
+    *data_size += message->origin_size;
+    *data_size += message->data_size;
+    out_data = (uint8_t*) malloc(sizeof(uint8_t) * *data_size);
+    if (out_data == NULL) {
+      return OCTOPIPES_ERROR_BAD_ALLOC;
+    }
+    size_t data_ptr = 0;
+    //SOH
+    data[data_ptr++] = SOH;
+    //Version
+    data[data_ptr++] = message->version;
+    //Origin / origin_size
+    data[data_ptr++] = message->origin_size;
+    memcpy(data + data_ptr, message->origin, message->origin_size);
+    data_ptr += message->origin_size;
+    //Remote / remote size
+    data[data_ptr++] = message->remote_size;
+    memcpy(data + data_ptr, message->remote, message->remote_size);
+    data_ptr += message->remote_size;
+    //TTL
+    data[data_ptr++] = message->ttl;
+    //Data size
+    data[data_ptr++] = (message->data_size >> 56) & 0xFF;
+    data[data_ptr++] = (message->data_size >> 48) & 0xFF;
+    data[data_ptr++] = (message->data_size >> 40) & 0xFF;
+    data[data_ptr++] = (message->data_size >> 32) & 0xFF;
+    data[data_ptr++] = (message->data_size >> 24) & 0xFF;
+    data[data_ptr++] = (message->data_size >> 16) & 0xFF;
+    data[data_ptr++] = (message->data_size >> 8) & 0xFF;
+    data[data_ptr++] = message->data_size & 0xFF;
+    //Options
+    data[data_ptr++] = message->options;
+    //Keep position of checksum, and go ahead
+    size_t checksum_ptr = data_ptr;
+    data_ptr++;
+    //STX
+    data[data_ptr++] = STX;
+    //Write data
+    memcpy(data + data_ptr, message->data, message->data_size);
+    //Write ETX
+    data[data_ptr++] = ETX;
+    //Checksum as last thing
+    message->checksum = 0;
+    if (message->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM != 0) {
+      message->checksum = calculate_checksum(message);
+    }
+    data[checksum_ptr] = message->checksum;
+  } else {
+    return OCTOPIPES_ERROR_UNSUPPORTED_VERSION;
+  }
+  //Assign out data to data
+  *data = out_data;
+  return OCTOPIPES_ERROR_SUCCESS;
+}
 
+/**
+ * @brief calculate checksum for message
+ * @param OctopipesMessage*
+ * @return uint8_t checksum
+ */
+
+uint8_t calculate_checksum(const OctopipesMessage* message) {
+  
 }
 
 OctopipesError fifo_receive(const char* fifo, uint8_t** data, size_t* data_size) {
