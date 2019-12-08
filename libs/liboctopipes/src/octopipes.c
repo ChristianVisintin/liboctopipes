@@ -387,7 +387,7 @@ OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_
  */
 
 const char* octopipes_get_error_desc(const OctopipesError error) {
-  
+  //TODO: implement
 }
 
 //Internal functions
@@ -398,7 +398,7 @@ const char* octopipes_get_error_desc(const OctopipesError error) {
  */
 
 void octopipes_loop(OctopipesClient* client) {
-
+  //TODO: implement
 }
 
 /**
@@ -626,13 +626,40 @@ OctopipesError octopipes_encode(OctopipesMessage* message, uint8_t** data, size_
  */
 
 uint8_t calculate_checksum(const OctopipesMessage* message) {
-  
+  uint8_t checksum = SOH; //Start with SOH
+  if (message->version == OCTOPIPES_VERSION_1) {
+    checksum = checksum ^ message->version;
+    checksum = checksum ^ message->origin_size;
+    for (size_t i = 0; i < message->origin_size; i++) {
+      checksum = checksum ^ message->origin[i];
+    }
+    checksum = checksum ^ message->remote_size;
+    for (size_t i = 0; i < message->remote_size; i++) {
+      checksum = checksum ^ message->remote[i];
+    }
+    checksum = checksum ^ message->ttl;
+    //Data size
+    checksum = checksum ^ (message->data_size >> 56) & 0xFF;
+    checksum = checksum ^ (message->data_size >> 48) & 0xFF;
+    checksum = checksum ^ (message->data_size >> 40) & 0xFF;
+    checksum = checksum ^ (message->data_size >> 32) & 0xFF;
+    checksum = checksum ^ (message->data_size >> 24) & 0xFF;
+    checksum = checksum ^ (message->data_size >> 16) & 0xFF;
+    checksum = checksum ^ (message->data_size >> 8) & 0xFF;
+    checksum = checksum ^ message->data_size & 0xFF;
+    checksum = checksum ^ message->options;
+    for (size_t i = 0; i < message->data_size; i++) {
+      checksum = checksum ^ message->data[i];
+    }
+  }
+  checksum = checksum ^ ETX; //Eventually xor with etx
+  return checksum;  
 }
 
 OctopipesError fifo_receive(const char* fifo, uint8_t** data, size_t* data_size) {
-
+  //TODO: implement
 }
 
 OctopipesError fifo_send(const char* fifo, const uint8_t* data, const size_t data_size) {
-
+  //TODO: implement
 }
