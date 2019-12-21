@@ -32,6 +32,16 @@
 #include <unistd.h> 
 
 /**
+ * @brief create the fifo described in the fifo parameter
+ * @param char* fifo path
+ * @return OctopipesError
+ */
+
+OctopipesError pipe_create(const char* fifo) {
+  return (mkfifo(fifo, 666) == 0) ? OCTOPIPES_ERROR_SUCCESS : OCTOPIPES_ERROR_OPEN_FAILED;
+}
+
+/**
  * @brief poll fifo to check if new messages has arrived, in case something arrived, the fifo will be read
  * @param char* fifo path
  * @param uint8_t** buffer to store received data

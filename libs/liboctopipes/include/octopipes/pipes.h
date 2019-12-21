@@ -27,6 +27,7 @@
 #include "types.h"
 
 //I/O
+OctopipesError pipe_create(const char* fifo);
 OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size, const int timeout);
 OctopipesError pipe_send(const char* fifo, const uint8_t* data, const size_t data_size, const int timeout);
 
