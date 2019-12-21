@@ -28,9 +28,12 @@
 extern "C" {
 #endif
 
-#include <octopipes/types.h>
+#include "types.h"
 
+//Version defines
 #define OCTOPIPES_LIB_VERSION "0.1.0"
+#define OCTOPIPES_LIB_VERSION_MAJOR 0
+#define OCTOPIPES_LIB_VERSION_MINOR 1
 
 //Functions
 //Alloc operations
@@ -47,6 +50,7 @@ OctopipesError octopipes_send(OctopipesClient* client, const char* remote, const
 OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, const void* data, uint64_t data_size, const uint8_t ttl, const OctopipesOptions options);
 //Callbacks
 OctopipesError octopipes_set_received_cb(OctopipesClient* client, void (*on_received)(const OctopipesMessage*));
+OctopipesError octopipes_set_sent_cb(OctopipesClient* client, void (*on_sent)(const OctopipesMessage*));
 OctopipesError octopipes_set_subscribed_cb(OctopipesClient* client, void (*on_subscribed)());
 OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_unsubscribed)());
 //Errors

@@ -23,6 +23,7 @@
 
 #include <octopipes/octopipes.h>
 #include <octopipes/cap.h>
+#include <octopipes/pipes.h>
 
 #include <string.h>
 
@@ -39,9 +40,6 @@ void octopipes_loop(OctopipesClient* client);
 OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, OctopipesMessage** message);
 OctopipesError octopipes_encode(OctopipesMessage* message, uint8_t** data, size_t* data_size);
 uint8_t calculate_checksum(const OctopipesMessage* message);
-//I/O
-OctopipesError fifo_receive(const char* fifo, uint8_t** data, size_t* data_size);
-OctopipesError fifo_send(const char* fifo, const uint8_t* data, const size_t data_size);
 
 /**
  * @brief initializes a OctopipesClient instance, the client mustn't be allocated before call, the client_id and cap_path are copied, so must be freed by the user later
@@ -76,6 +74,7 @@ OctopipesError octopipes_init(OctopipesClient** client, const char* client_id, c
   (*client)->tx_pipe = NULL;
   (*client)->state = OCTOPIPES_STATE_INIT;
   (*client)->on_received = NULL;
+  (*client)->on_sent = NULL;
   (*client)->on_subscribed = NULL;
   (*client)->on_unsubscribed = NULL;
   return OCTOPIPES_ERROR_SUCCESS;
@@ -194,7 +193,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
     return rc;
   }
   //Send packet
-  rc = fifo_send(client->common_access_pipe, out_data, out_data_size);
+  rc = pipe_send(client->common_access_pipe, out_data, out_data_size, 5000);
   free(out_data);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
@@ -202,7 +201,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   //If packet was sent successfully, then wait for assignment
   uint8_t* in_data;
   size_t in_data_size;
-  rc = fifo_receive(client->common_access_pipe, &in_data, &in_data_size);
+  rc = pipe_receive(client->common_access_pipe, &in_data, &in_data_size, 5000);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
   }
@@ -211,6 +210,10 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   if (rc == OCTOPIPES_ERROR_SUCCESS) {
     //Enter subscribed state
     client->state = OCTOPIPES_STATE_SUBSCRIBED;
+  }
+  //Call on unsubscribed callback
+  if (client->on_subscribed != NULL) {
+    client->on_subscribed();
   }
   //Free input data, and return rc
   free(in_data);
@@ -262,10 +265,14 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
     return rc;
   }
   //Send packet
-  rc = fifo_send(client->common_access_pipe, out_data, out_data_size);
+  rc = pipe_send(client->common_access_pipe, out_data, out_data_size, 5000);
   free(out_data);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
+  }
+  //Call on unsubscribed callback
+  if (client->on_unsubscribed != NULL) {
+    client->on_unsubscribed();
   }
   //Set state to unsubscribed
   if (rc == OCTOPIPES_ERROR_SUCCESS) {
@@ -325,12 +332,18 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
   size_t out_data_size;
   uint8_t* out_data;
   OctopipesError rc = octopipes_encode(message, &out_data, &out_data_size);
-  free(message);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
+    free(message);
     return rc;
   }
   //Write to FIFO
-  rc = fifo_send(client->tx_pipe, out_data, out_data_size);
+  rc = pipe_send(client->tx_pipe, out_data, out_data_size, ttl * 1000);
+  //Call on sent callback if necessary
+  if (rc == OCTOPIPES_ERROR_SUCCESS && client->on_sent != NULL) {
+    client->on_sent(message);
+  }
+  //Call on sent
+  free(message);
   free(out_data);
   return rc;
 }
@@ -347,6 +360,21 @@ OctopipesError octopipes_set_received_cb(OctopipesClient* client, void (*on_rece
     return OCTOPIPES_ERROR_UNINITIALIZED;
   }
   client->on_received = on_received;
+  return OCTOPIPES_ERROR_SUCCESS; 
+}
+
+/**
+ * @brief set the function to call when a message is successfully sent to the octopipes client
+ * @param OctopipesClient*
+ * @param function
+ * @return OctopipesError
+ */
+
+OctopipesError octopipes_set_sent_cb(OctopipesClient* client, void (*on_sent)(const OctopipesMessage*)) {
+  if (client == NULL) {
+    return OCTOPIPES_ERROR_UNINITIALIZED;
+  }
+  client->on_sent = on_sent;
   return OCTOPIPES_ERROR_SUCCESS; 
 }
 
@@ -654,12 +682,4 @@ uint8_t calculate_checksum(const OctopipesMessage* message) {
   }
   checksum = checksum ^ ETX; //Eventually xor with etx
   return checksum;  
-}
-
-OctopipesError fifo_receive(const char* fifo, uint8_t** data, size_t* data_size) {
-  //TODO: implement
-}
-
-OctopipesError fifo_send(const char* fifo, const uint8_t* data, const size_t data_size) {
-  //TODO: implement
 }
