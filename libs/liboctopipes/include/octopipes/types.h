@@ -34,6 +34,8 @@ typedef enum OctopipesError {
   OCTOPIPES_ERROR_BAD_PACKET,
   OCTOPIPES_ERROR_BAD_CHECKSUM,
   OCTOPIPES_ERROR_UNSUPPORTED_VERSION,
+  OCTOPIPES_ERROR_NO_DATA_AVAILABLE,
+  OCTOPIPES_ERROR_OPEN_FAILED,
   OCTOPIPES_ERROR_WRITE_FAILED,
   OCTOPIPES_ERROR_READ_FAILED,
   OCTOPIPES_ERROR_NOT_SUBSCRIBED,
@@ -90,6 +92,7 @@ typedef struct OctopipesClient {
   char* rx_pipe;
   //Callbacks
   void (*on_received)(const OctopipesMessage*);
+  void (*on_sent)(const OctopipesMessage*);
   void (*on_subscribed)();
   void (*on_unsubscribed)();
 } OctopipesClient;
