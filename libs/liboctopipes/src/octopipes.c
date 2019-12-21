@@ -431,7 +431,39 @@ OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_
  */
 
 const char* octopipes_get_error_desc(const OctopipesError error) {
-  //TODO: implement
+  switch (error) {
+    case OCTOPIPES_ERROR_BAD_ALLOC:
+      return "Could not allocate more memory in the heap";
+    case OCTOPIPES_ERROR_BAD_CHECKSUM:
+      return "The last packet has a bad checksum and the ignore checksum flag is set to 0";
+    case OCTOPIPES_ERROR_BAD_PACKET:
+      return "The packet syntax is invalid or is unexpected";
+    case OCTOPIPES_ERROR_CAP_TIMEOUT:
+      return "The CAP timeout. The request hasn't been fulfilled in time.";
+    case OCTOPIPES_ERROR_NO_DATA_AVAILABLE:
+      return "There's no data available to be read";
+    case OCTOPIPES_ERROR_NOT_SUBSCRIBED:
+      return "The client is not subscribed yet to Octopipes server. Sending of messages to server is allowed only using the CAP.";
+    case OCTOPIPES_ERROR_NOT_UNSUBSCRIBED:
+      return "This operation is not permitted, since the client isn't unsubscribed";
+    case OCTOPIPES_ERROR_OPEN_FAILED:
+      return "Could not open the FIFO";
+    case OCTOPIPES_ERROR_READ_FAILED:
+      return "An error occurred while trying to read from FIFO";
+    case OCTOPIPES_ERROR_SUCCESS:
+      return "Not an error";
+    case OCTOPIPES_ERROR_THREAD:
+      return "Could not start loop thread";
+    case OCTOPIPES_ERROR_UNINITIALIZED:
+      return "The OctopipesClient must be initialized calling octopipes_init() first";
+    case OCTOPIPES_ERROR_UNSUPPORTED_VERSION:
+      return "This protocol version is unsupported by Octopipes Version " OCTOPIPES_LIB_VERSION;
+    case OCTOPIPES_ERROR_WRITE_FAILED:
+      return "Could not write data to FIFO";
+    case OCTOPIPES_ERROR_UNKNOWN_ERROR:
+    default:
+      return "Unknown error";
+  }
 }
 
 //Internal functions
