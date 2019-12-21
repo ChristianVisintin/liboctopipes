@@ -43,7 +43,7 @@ OctopipesError octopipes_cleanup(OctopipesClient* client);
 OctopipesError octopipes_loop_start(OctopipesClient* client);
 OctopipesError octopipes_loop_stop(OctopipesClient* client);
 //Cap operartions
-OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups, size_t groups_amount);
+OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups, size_t groups_amount, OctopipesCapError* assignment_error);
 OctopipesError octopipes_unsubscribe(OctopipesClient* client);
 //Tx operations
 OctopipesError octopipes_send(OctopipesClient* client, const char* remote, const void* data, uint64_t data_size);
