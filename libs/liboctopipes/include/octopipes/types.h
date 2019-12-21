@@ -94,6 +94,7 @@ typedef struct OctopipesClient {
   //Callbacks
   void (*on_received)(const OctopipesMessage*);
   void (*on_sent)(const OctopipesMessage*);
+  void (*on_receive_error)(const OctopipesError);
   void (*on_subscribed)();
   void (*on_unsubscribed)();
 } OctopipesClient;

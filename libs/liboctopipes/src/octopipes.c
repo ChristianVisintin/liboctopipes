@@ -75,6 +75,7 @@ OctopipesError octopipes_init(OctopipesClient** client, const char* client_id, c
   (*client)->state = OCTOPIPES_STATE_INIT;
   (*client)->on_received = NULL;
   (*client)->on_sent = NULL;
+  (*client)->on_receive_error = NULL;
   (*client)->on_subscribed = NULL;
   (*client)->on_unsubscribed = NULL;
   return OCTOPIPES_ERROR_SUCCESS;
@@ -125,7 +126,6 @@ OctopipesError octopipes_loop_start(OctopipesClient* client) {
   if(pthread_create(&client->loop, NULL, octopipes_loop, client) != 0) {
     return OCTOPIPES_ERROR_THREAD;
   }
-  client->state = OCTOPIPES_STATE_RUNNING;
   return OCTOPIPES_ERROR_SUCCESS;
 }
 
@@ -395,6 +395,21 @@ OctopipesError octopipes_set_sent_cb(OctopipesClient* client, void (*on_sent)(co
 }
 
 /**
+ * @brief set the function to call when an error is returned during the receive of a message
+ * @param OctopipesClient*
+ * @param function
+ * @return OctopipesError
+ */
+
+OctopipesError octopipes_set_receive_error_cb(OctopipesClient* client, void (*on_receive_error)(const OctopipesError)) {
+  if (client == NULL) {
+    return OCTOPIPES_ERROR_UNINITIALIZED;
+  }
+  client->on_receive_error = on_receive_error;
+  return OCTOPIPES_ERROR_SUCCESS; 
+}
+
+/**
  * @brief set the function to call when the client subscribe to the server
  * @param OctopipesClient*
  * @param function
@@ -474,7 +489,39 @@ const char* octopipes_get_error_desc(const OctopipesError error) {
  */
 
 void octopipes_loop(OctopipesClient* client) {
-  //TODO: implement
+  client->state = OCTOPIPES_STATE_RUNNING;
+  while (client->state == OCTOPIPES_STATE_RUNNING) {
+    //Check if there are available messages to be read
+    uint8_t* data_in;
+    size_t data_in_size;
+    OctopipesError rc = pipe_receive(client->rx_pipe, &data_in, &data_in_size, 500); //500 ms
+    if (rc == OCTOPIPES_ERROR_SUCCESS) {
+      //Parse data
+      OctopipesMessage* message;
+      if ((rc = octopipes_decode(data_in, data_in_size, &message)) == OCTOPIPES_ERROR_SUCCESS) {
+        //Decoding was successful, report received message
+        if (client->on_received != NULL) {
+          client->on_received(message); //@! Success
+        }
+        free(message);
+      } else {
+        //@! Report error
+        if (client->on_receive_error != NULL) {
+          client->on_receive_error(rc);
+        }
+      }
+      //Free data
+      free(data_in);
+    } else if (rc == OCTOPIPES_ERROR_NO_DATA_AVAILABLE) {
+      //It's ok, just keep waiting
+    } else {
+      //@! Report error
+      if (client->on_receive_error != NULL) {
+        client->on_receive_error(rc);
+      }
+    }
+    //TODO: Other things to do here?
+  }
 }
 
 /**
