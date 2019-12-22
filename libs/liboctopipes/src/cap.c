@@ -37,7 +37,7 @@ uint8_t* octopipes_cap_prepare_subscribe(const char** groups, const size_t group
   size_t current_size = 2; //Size is at least 2 (descriptor, groups amount)
   //Iterate over groups to get total size
   for (size_t i = 0; i < groups_size; i++) {
-    current_size += strlen(groups[i]);
+    current_size += strlen(groups[i]) + 1; //Group size + its size byte
   }
   //Allocate buffer
   uint8_t* data = (uint8_t*) malloc(sizeof(uint8_t) * current_size);
@@ -148,17 +148,20 @@ OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t d
   size_t curr_group = 0;
   //Allocate groups
   *groups = (char**) malloc(sizeof(char*) * *groups_amount);
+  if (*groups == NULL) {
+    return OCTOPIPES_ERROR_BAD_ALLOC;
+  }
   while (data_ptr < data_size && curr_group < *groups_amount) {
     //Read group name size
     const size_t this_group_size = data[data_ptr++];
     //Allocate group
     char* this_group = (char*) malloc(sizeof(char) * (this_group_size + 1));
-    if (data_ptr + this_group_size >= data_size || this_group == NULL) {
+    if (data_ptr + this_group_size > data_size || this_group == NULL) {
       //Select error
       OctopipesError rc = (this_group == NULL) ? OCTOPIPES_ERROR_BAD_ALLOC : OCTOPIPES_ERROR_BAD_PACKET;
       //Free groups
       for (size_t i = 0; i < curr_group + 1; i++) {
-        free(*groups[i]);
+        free((*groups)[i]);
       }
       free(*groups);
       return rc; //Not enough bytes
@@ -168,7 +171,7 @@ OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t d
     //Add null terminator to group
     this_group[this_group_size] = 0x00;
     //Assign this group to groups
-    *groups[curr_group] = this_group;
+    (*groups)[curr_group] = this_group;
     //Increment data ptr of this groups size
     data_ptr += this_group_size;
     //Increment current group
@@ -210,21 +213,21 @@ OctopipesError octopipes_cap_parse_assign(const uint8_t* data, const size_t data
     return OCTOPIPES_ERROR_BAD_PACKET;
   }
   memcpy(*fifo_tx, data + 3, pipe_tx_size);
-  *fifo_tx[pipe_tx_size] = 0x00;
+  (*fifo_tx)[pipe_tx_size] = 0x00;
   data_ptr +=  pipe_tx_size;
   const size_t pipe_rx_size = data[data_ptr];
   data_ptr++;
   *fifo_rx = (char*) malloc(sizeof(char) * (pipe_rx_size + 1));
-  if (*fifo_tx == NULL) {
+  if (*fifo_rx == NULL) {
     free(*fifo_tx);
     return OCTOPIPES_ERROR_BAD_ALLOC;
-  } else if (data_ptr + pipe_rx_size >= data_size) {
+  } else if (data_ptr + pipe_rx_size > data_size) {
     free(*fifo_tx);
     free(*fifo_rx);
     return OCTOPIPES_ERROR_BAD_PACKET;
   }
   memcpy(*fifo_rx, data + data_ptr, pipe_rx_size);
-  *fifo_rx[pipe_rx_size] = 0x00;
+  (*fifo_rx)[pipe_rx_size] = 0x00;
   return OCTOPIPES_ERROR_SUCCESS;
 }
 

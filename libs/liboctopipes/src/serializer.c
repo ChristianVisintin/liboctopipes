@@ -48,7 +48,7 @@ OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, Oct
   message_ptr->data = NULL;
   message_ptr->origin = NULL;
   message_ptr->remote = NULL;
-  if (data_size < current_minimum_size) { //Minimum packet size
+  if (data_size < current_minimum_size || data == NULL) { //Minimum packet size
     goto decode_bad_packet;
   }
   if (data[0] != SOH || data[data_size - 1] != ETX) { //Check first and last byte
@@ -65,13 +65,17 @@ OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, Oct
     }
     //Allocate origin size
     data_ptr = 3; //next position after SOH + VERSION + LNS
-    message_ptr->origin = (char*) malloc(sizeof(char) * message_ptr->origin_size + 1); //+1 null terminator
-    if (message_ptr->origin == NULL) {
-      goto decode_bad_alloc;
+    if (message_ptr->origin_size > 0) {
+      message_ptr->origin = (char*) malloc(sizeof(char) * message_ptr->origin_size + 1); //+1 null terminator
+      if (message_ptr->origin == NULL) {
+        goto decode_bad_alloc;
+      }
+      memcpy(message_ptr->origin, data + data_ptr, message_ptr->origin_size);
+      message_ptr->origin[message_ptr->origin_size] = 0x00;
+      data_ptr += message_ptr->origin_size;
+    } else {
+      message_ptr->origin = NULL;
     }
-    memcpy(message_ptr->origin, data + data_ptr, message_ptr->origin_size);
-    message_ptr->origin[message_ptr->origin_size] = 0x00;
-    data_ptr += message_ptr->origin_size;
     //Remote
     message_ptr->remote_size = data[data_ptr];
     current_minimum_size += message_ptr->remote_size;
@@ -79,12 +83,16 @@ OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, Oct
       goto decode_bad_packet;
     }
     data_ptr++;
-    message_ptr->remote = (char*) malloc(sizeof(char) * message_ptr->remote_size + 1);
-    if (message_ptr->remote == NULL) {
-      goto decode_bad_alloc;
+    if (message_ptr->remote_size > 0) {
+      message_ptr->remote = (char*) malloc(sizeof(char) * message_ptr->remote_size + 1);
+      if (message_ptr->remote == NULL) {
+        goto decode_bad_alloc;
+      }
+      memcpy(message_ptr->remote, data + data_ptr, message_ptr->remote_size);
+      message_ptr->remote[message_ptr->remote_size] = 0x00;
+    } else {
+      message_ptr->remote = NULL;
     }
-    memcpy(message_ptr->remote, data + data_ptr, message_ptr->remote_size);
-    message_ptr->remote[message_ptr->remote_size] = 0x00;
     data_ptr += message_ptr->remote_size;
     //TTL
     message_ptr->ttl = data[data_ptr++];
