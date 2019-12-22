@@ -54,7 +54,12 @@ add_executable(test_pipes ${PIPES_TEST_SRC})
 target_link_libraries(test_pipes octopipes_shared -lpthread)
 add_executable(test_parser ${PARSER_TEST_SRC})
 target_link_libraries(test_parser octopipes_shared -lpthread)
-
+if(CMAKE_COMPILER_IS_GNUCXX)
+  target_compile_options(test_pipes PUBLIC "-fcoverage-mapping -fprofile-instr-generate -fprofile-arcs -ftest-coverage")
+  target_compile_options(test_parser PUBLIC "-fcoverage-mapping -fprofile-instr-generate -fprofile-arcs -ftest-coverage")
+  target_link_libraries(test_parser gcov)
+  target_link_libraries(test_pipes gcov)
+endif()
 #Install rules
 install(TARGETS octopipes_shared CONFIGURATIONS Release LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)
 install(TARGETS octopipes_static CONFIGURATIONS Release ARCHIVE DESTINATION lib)
