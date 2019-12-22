@@ -200,39 +200,30 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
     return rc;
   }
   //If packet was sent successfully, then wait for assignment
-  OctopipesCapMessage message_type = OCTOPIPES_CAP_UNKNOWN;
-  const int max_retries = 3;
-  int retries = 0;
-  while (message_type != OCTOPIPES_CAP_ASSIGNMENT && retries < max_retries) {
-    uint8_t* in_data;
-    size_t in_data_size;
-    rc = pipe_receive(client->common_access_pipe, &in_data, &in_data_size, 5000);
-    if (rc != OCTOPIPES_ERROR_SUCCESS) {
-      return rc;
-    }
-    //Verify packet type
-    message_type = octopipes_cap_get_message(in_data, in_data_size);
-    if (message_type != OCTOPIPES_CAP_ASSIGNMENT) { //Just wait for the correct packet
-      retries++; //Increment retries
-      //Write the packet back to FIFO
-      pipe_send(client->common_access_pipe, in_data, in_data_size, 5000);
-      free(in_data);
-      rc = OCTOPIPES_ERROR_CAP_TIMEOUT;
-      continue;
-    }
-    //Parse assignment
-    rc = octopipes_cap_parse_assign(in_data, in_data_size, &assignment_error, &client->tx_pipe, &client->rx_pipe);
-    if (rc == OCTOPIPES_ERROR_SUCCESS) {
-      //Enter subscribed state
-      client->state = OCTOPIPES_STATE_SUBSCRIBED;
-      //Call on unsubscribed callback
-      if (client->on_subscribed != NULL) {
-        client->on_subscribed();
-      }
-    }
-    //Free input data, and return rc
-    free(in_data);
+  uint8_t* in_data;
+  size_t in_data_size;
+  rc = pipe_receive(client->common_access_pipe, &in_data, &in_data_size, 5000);
+  if (rc != OCTOPIPES_ERROR_SUCCESS) {
+    return rc;
   }
+  //Verify packet type
+  OctopipesCapMessage message_type = octopipes_cap_get_message(in_data, in_data_size);
+  if (message_type != OCTOPIPES_CAP_ASSIGNMENT) { //Return bad packet, the user must redo the operation
+    free(in_data);
+    return OCTOPIPES_ERROR_BAD_PACKET;
+  }
+  //Parse assignment
+  rc = octopipes_cap_parse_assign(in_data, in_data_size, &assignment_error, &client->tx_pipe, &client->rx_pipe);
+  if (rc == OCTOPIPES_ERROR_SUCCESS) {
+    //Enter subscribed state
+    client->state = OCTOPIPES_STATE_SUBSCRIBED;
+    //Call on unsubscribed callback
+    if (client->on_subscribed != NULL) {
+      client->on_subscribed();
+    }
+  }
+  //Free input data, and return rc
+  free(in_data);
   return rc;
 }
 
@@ -520,7 +511,7 @@ void octopipes_loop(OctopipesClient* client) {
         client->on_receive_error(rc);
       }
     }
-    //TODO: Other things to do here?
+    //Nothing else to do
   }
 }
 
