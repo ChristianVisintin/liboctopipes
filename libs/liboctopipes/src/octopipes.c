@@ -187,7 +187,9 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   //Set origin as client
   subscribe_message->version = client->protocol_version;
   subscribe_message->origin_size = client->client_id_size;
-  subscribe_message->origin = client->client_id;
+  subscribe_message->origin = (char*) malloc(sizeof(char) * (client->client_id_size + 1));
+  memcpy(subscribe_message->origin, client->client_id, client->client_id_size);
+  subscribe_message->origin[client->client_id_size] = 0x00;
   //Server is 0
   subscribe_message->remote_size = 0;
   subscribe_message->remote = NULL;
@@ -264,7 +266,13 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   //Set origin as client
   subscribe_message->version = client->protocol_version;
   subscribe_message->origin_size = client->client_id_size;
-  subscribe_message->origin = client->client_id;
+  subscribe_message->origin = (char*) malloc(sizeof(char) * (subscribe_message->origin_size + 1));
+  if (subscribe_message->origin == NULL) {
+    octopipes_cleanup_message(subscribe_message);
+    return OCTOPIPES_ERROR_BAD_ALLOC;
+  }
+  memcpy(subscribe_message->origin, client->client_id, subscribe_message->origin_size);
+  subscribe_message->origin[subscribe_message->origin_size] = 0x00;
   //Server is 0
   subscribe_message->remote_size = 0;
   subscribe_message->remote = NULL;
@@ -274,15 +282,14 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   //Data
   subscribe_message->data = octopipes_cap_prepare_unsubscribe((size_t*) &subscribe_message->data_size);
   if (subscribe_message->data == NULL) {
-    free(subscribe_message);
+    octopipes_cleanup_message(subscribe_message);
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
   //Encode message
   size_t out_data_size;
   uint8_t* out_data;
   rc = octopipes_encode(subscribe_message, &out_data, &out_data_size);
-  free(subscribe_message->data);
-  free(subscribe_message);
+  octopipes_cleanup_message(subscribe_message);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
   }
@@ -342,14 +349,31 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
   }
   //Fill message structure
   message->version = client->protocol_version;
-  message->origin = client->client_id;
   message->origin_size = client->client_id_size;
-  message->remote = (char*) remote;
+  message->origin = (char*) malloc(sizeof(char) * (message->origin_size + 1));
+  if (message->origin == NULL) {
+    octopipes_cleanup_message(message);
+    return OCTOPIPES_ERROR_BAD_ALLOC;
+  }
+  memcpy(message->origin, client->client_id, message->origin_size);
+  message->origin[message->origin_size] = 0x00;
   message->remote_size = strlen(remote);
+  message->remote = (char*) malloc(sizeof(char) * (message->remote_size + 1));
+  if (message->remote == NULL) {
+    octopipes_cleanup_message(message);
+    return OCTOPIPES_ERROR_BAD_ALLOC;
+  }
+  memcpy(message->remote, remote, message->remote_size);
+  message->origin[message->remote_size] = 0x00;
   message->options = options;
   message->ttl = ttl;
-  message->data = (uint8_t*) data;
   message->data_size = data_size;
+  message->data = (uint8_t*) malloc(sizeof(uint8_t) * message->data_size);
+  if (message->data == NULL) {
+    octopipes_cleanup_message(message);
+    return OCTOPIPES_ERROR_BAD_ALLOC;
+  }
+  memcpy(message->data, (uint8_t*) data, message->data_size);
   //Encode message
   size_t out_data_size;
   uint8_t* out_data;
