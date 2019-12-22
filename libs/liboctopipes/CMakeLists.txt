@@ -50,3 +50,9 @@ add_executable(test_pipes ${PIPES_TEST_SRC})
 target_link_libraries(test_pipes octopipes_shared -lpthread)
 add_executable(test_parser ${PARSER_TEST_SRC})
 target_link_libraries(test_parser octopipes_shared -lpthread)
+
+#Install rules
+install(TARGETS octopipes_shared CONFIGURATIONS Release LIBRARY DESTINATION Release/lib PUBLIC_HEADER DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/include/")
+install(TARGETS octopipes_static CONFIGURATIONS Release LIBRARY DESTINATION Release/lib)
+install(TARGETS octopipes_send CONFIGURATIONS Release RUNTIME DESTINATION Release/bin)
+install(TARGETS octopipes_sub CONFIGURATIONS Release RUNTIME DESTINATION Release/bin)
