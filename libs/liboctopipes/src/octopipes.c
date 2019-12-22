@@ -35,7 +35,7 @@
 
 //Private properties and functions
 //Threads
-void octopipes_loop(OctopipesClient* client);
+void* octopipes_loop(void* args);
 //Encoding/decoding
 OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, OctopipesMessage** message);
 OctopipesError octopipes_encode(OctopipesMessage* message, uint8_t** data, size_t* data_size);
@@ -179,7 +179,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   subscribe_message->ttl = DEFAULT_TTL;
   subscribe_message->options = OCTOPIPES_OPTIONS_NONE;
   //Data
-  subscribe_message->data = octopipes_cap_prepare_subscribe(groups, groups_amount, &subscribe_message->data_size);
+  subscribe_message->data = octopipes_cap_prepare_subscribe(groups, groups_amount, (size_t*) &subscribe_message->data_size);
   if (subscribe_message->data == NULL) {
     free(subscribe_message);
     return OCTOPIPES_ERROR_BAD_ALLOC;
@@ -187,7 +187,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   //Encode message
   size_t out_data_size;
   uint8_t* out_data;
-  OctopipesError rc = octopipes_encode(subscribe_message, &out_data, out_data_size);
+  OctopipesError rc = octopipes_encode(subscribe_message, &out_data, &out_data_size);
   free(subscribe_message->data);
   free(subscribe_message);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
@@ -213,7 +213,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
     return OCTOPIPES_ERROR_BAD_PACKET;
   }
   //Parse assignment
-  rc = octopipes_cap_parse_assign(in_data, in_data_size, &assignment_error, &client->tx_pipe, &client->rx_pipe);
+  rc = octopipes_cap_parse_assign(in_data, in_data_size, assignment_error, &client->tx_pipe, &client->rx_pipe);
   if (rc == OCTOPIPES_ERROR_SUCCESS) {
     //Enter subscribed state
     client->state = OCTOPIPES_STATE_SUBSCRIBED;
@@ -257,7 +257,7 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   subscribe_message->ttl = DEFAULT_TTL;
   subscribe_message->options = OCTOPIPES_OPTIONS_NONE;
   //Data
-  subscribe_message->data = octopipes_cap_prepare_unsubscribe(&subscribe_message->data_size);
+  subscribe_message->data = octopipes_cap_prepare_unsubscribe((size_t*) &subscribe_message->data_size);
   if (subscribe_message->data == NULL) {
     free(subscribe_message);
     return OCTOPIPES_ERROR_BAD_ALLOC;
@@ -265,7 +265,7 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   //Encode message
   size_t out_data_size;
   uint8_t* out_data;
-  OctopipesError rc = octopipes_encode(subscribe_message, &out_data, &out_data_size);
+  rc = octopipes_encode(subscribe_message, &out_data, &out_data_size);
   free(subscribe_message->data);
   free(subscribe_message);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
@@ -329,11 +329,11 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
   message->version = client->protocol_version;
   message->origin = client->client_id;
   message->origin_size = client->client_id_size;
-  message->remote = remote;
+  message->remote = (char*) remote;
   message->remote_size = strlen(remote);
   message->options = options;
   message->ttl = ttl;
-  message->data = data;
+  message->data = (uint8_t*) data;
   message->data_size = data_size;
   //Encode message
   size_t out_data_size;
@@ -479,7 +479,8 @@ const char* octopipes_get_error_desc(const OctopipesError error) {
  * @param OctopipesClient*
  */
 
-void octopipes_loop(OctopipesClient* client) {
+void* octopipes_loop(void* args) {
+  OctopipesClient* client = (OctopipesClient*) args;
   client->state = OCTOPIPES_STATE_RUNNING;
   while (client->state == OCTOPIPES_STATE_RUNNING) {
     //Check if there are available messages to be read
@@ -513,6 +514,7 @@ void octopipes_loop(OctopipesClient* client) {
     }
     //Nothing else to do
   }
+  return NULL;
 }
 
 /**
@@ -611,7 +613,7 @@ OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, Oct
       memcpy(message_ptr->data, data + data_ptr, message_ptr->data_size);
     }
     //Verify checksum if required
-    if (message_ptr->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM != 0) {
+    if ((message_ptr->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM) != 0) {
       uint8_t verification_checksum = calculate_checksum(message_ptr);
       if (verification_checksum != message_ptr->checksum) {
         goto decode_bad_checksum;
@@ -686,45 +688,45 @@ OctopipesError octopipes_encode(OctopipesMessage* message, uint8_t** data, size_
     }
     size_t data_ptr = 0;
     //SOH
-    data[data_ptr++] = SOH;
+    out_data[data_ptr++] = SOH;
     //Version
-    data[data_ptr++] = message->version;
+    out_data[data_ptr++] = message->version;
     //Origin / origin_size
-    data[data_ptr++] = message->origin_size;
-    memcpy(data + data_ptr, message->origin, message->origin_size);
-    data_ptr += message->origin_size;
+    out_data[data_ptr++] = message->origin_size;
+    memcpy(out_data + data_ptr, message->origin, message->origin_size);
+    out_data += message->origin_size;
     //Remote / remote size
-    data[data_ptr++] = message->remote_size;
-    memcpy(data + data_ptr, message->remote, message->remote_size);
+    out_data[data_ptr++] = message->remote_size;
+    memcpy(out_data + data_ptr, message->remote, message->remote_size);
     data_ptr += message->remote_size;
     //TTL
-    data[data_ptr++] = message->ttl;
+    out_data[data_ptr++] = message->ttl;
     //Data size
-    data[data_ptr++] = (message->data_size >> 56) & 0xFF;
-    data[data_ptr++] = (message->data_size >> 48) & 0xFF;
-    data[data_ptr++] = (message->data_size >> 40) & 0xFF;
-    data[data_ptr++] = (message->data_size >> 32) & 0xFF;
-    data[data_ptr++] = (message->data_size >> 24) & 0xFF;
-    data[data_ptr++] = (message->data_size >> 16) & 0xFF;
-    data[data_ptr++] = (message->data_size >> 8) & 0xFF;
-    data[data_ptr++] = message->data_size & 0xFF;
+    out_data[data_ptr++] = (message->data_size >> 56) & 0xFF;
+    out_data[data_ptr++] = (message->data_size >> 48) & 0xFF;
+    out_data[data_ptr++] = (message->data_size >> 40) & 0xFF;
+    out_data[data_ptr++] = (message->data_size >> 32) & 0xFF;
+    out_data[data_ptr++] = (message->data_size >> 24) & 0xFF;
+    out_data[data_ptr++] = (message->data_size >> 16) & 0xFF;
+    out_data[data_ptr++] = (message->data_size >> 8) & 0xFF;
+    out_data[data_ptr++] = message->data_size & 0xFF;
     //Options
-    data[data_ptr++] = message->options;
+    out_data[data_ptr++] = message->options;
     //Keep position of checksum, and go ahead
     size_t checksum_ptr = data_ptr;
     data_ptr++;
     //STX
-    data[data_ptr++] = STX;
+    out_data[data_ptr++] = STX;
     //Write data
-    memcpy(data + data_ptr, message->data, message->data_size);
+    memcpy(out_data + data_ptr, message->data, message->data_size);
     //Write ETX
-    data[data_ptr++] = ETX;
+    out_data[data_ptr++] = ETX;
     //Checksum as last thing
     message->checksum = 0;
-    if (message->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM != 0) {
+    if ((message->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM) != 0) {
       message->checksum = calculate_checksum(message);
     }
-    data[checksum_ptr] = message->checksum;
+    out_data[checksum_ptr] = message->checksum;
   } else {
     return OCTOPIPES_ERROR_UNSUPPORTED_VERSION;
   }
@@ -753,14 +755,14 @@ uint8_t calculate_checksum(const OctopipesMessage* message) {
     }
     checksum = checksum ^ message->ttl;
     //Data size
-    checksum = checksum ^ (message->data_size >> 56) & 0xFF;
-    checksum = checksum ^ (message->data_size >> 48) & 0xFF;
-    checksum = checksum ^ (message->data_size >> 40) & 0xFF;
-    checksum = checksum ^ (message->data_size >> 32) & 0xFF;
-    checksum = checksum ^ (message->data_size >> 24) & 0xFF;
-    checksum = checksum ^ (message->data_size >> 16) & 0xFF;
-    checksum = checksum ^ (message->data_size >> 8) & 0xFF;
-    checksum = checksum ^ message->data_size & 0xFF;
+    checksum = checksum ^ ((message->data_size >> 56) & 0xFF);
+    checksum = checksum ^ ((message->data_size >> 48) & 0xFF);
+    checksum = checksum ^ ((message->data_size >> 40) & 0xFF);
+    checksum = checksum ^ ((message->data_size >> 32) & 0xFF);
+    checksum = checksum ^ ((message->data_size >> 24) & 0xFF);
+    checksum = checksum ^ ((message->data_size >> 16) & 0xFF);
+    checksum = checksum ^ ((message->data_size >> 8) & 0xFF);
+    checksum = checksum ^ (message->data_size & 0xFF);
     checksum = checksum ^ message->options;
     for (size_t i = 0; i < message->data_size; i++) {
       checksum = checksum ^ message->data[i];

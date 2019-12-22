@@ -83,7 +83,7 @@ uint8_t* octopipes_cap_prepare_assign(OctopipesCapError error, const char* fifo_
   memcpy(data + curr_data_ptr, fifo_tx, fifo_tx_size);
   curr_data_ptr += fifo_tx_size;
   data[curr_data_ptr++] = (uint8_t) fifo_rx_size;
-  memcpy(data + curr_data_ptr, fifo_rx_size, fifo_rx);
+  memcpy(data + curr_data_ptr, fifo_rx, fifo_rx_size);
   return data;
 }
 
@@ -241,5 +241,7 @@ OctopipesError octopipes_cap_parse_unsubscribe(const uint8_t* data, const size_t
   }
   if (data[0] == OCTOPIPES_CAP_UNSUBSCRIBE) {
     return OCTOPIPES_ERROR_SUCCESS;
+  } else {
+    return OCTOPIPES_ERROR_BAD_PACKET;
   }
 }
