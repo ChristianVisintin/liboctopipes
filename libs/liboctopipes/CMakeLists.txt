@@ -7,6 +7,10 @@ set (ROOT_TESTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests/")
 include_directories(
   "${CMAKE_CURRENT_SOURCE_DIR}/include/"
 )
+#Includes
+file(GLOB INCLUDE_FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/octopipes/*.h"
+)
 
 #Library
 file(GLOB LIBOCTOPIPES_SRC
@@ -52,7 +56,8 @@ add_executable(test_parser ${PARSER_TEST_SRC})
 target_link_libraries(test_parser octopipes_shared -lpthread)
 
 #Install rules
-install(TARGETS octopipes_shared CONFIGURATIONS Release LIBRARY DESTINATION Release/lib PUBLIC_HEADER DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/include/")
-install(TARGETS octopipes_static CONFIGURATIONS Release LIBRARY DESTINATION Release/lib)
-install(TARGETS octopipes_send CONFIGURATIONS Release RUNTIME DESTINATION Release/bin)
-install(TARGETS octopipes_sub CONFIGURATIONS Release RUNTIME DESTINATION Release/bin)
+install(TARGETS octopipes_shared CONFIGURATIONS Release LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)
+install(TARGETS octopipes_static CONFIGURATIONS Release ARCHIVE DESTINATION lib)
+install(TARGETS octopipes_send CONFIGURATIONS Release RUNTIME DESTINATION bin)
+install(TARGETS octopipes_sub CONFIGURATIONS Release RUNTIME DESTINATION bin)
+INSTALL(FILES ${INCLUDE_FILES} DESTINATION include/octopipes/)
