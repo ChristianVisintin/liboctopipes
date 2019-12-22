@@ -42,6 +42,16 @@ OctopipesError pipe_create(const char* fifo) {
 }
 
 /**
+ * @brief delete the provided pipe path
+ * @param char* fifo path
+ * @return OctopipesError
+ */
+
+OctopipesError pipe_delete(const char* fifo) {
+  return (unlink(fifo) == 0) ? OCTOPIPES_ERROR_SUCCESS : OCTOPIPES_ERROR_OPEN_FAILED;
+}
+
+/**
  * @brief poll fifo to check if new messages has arrived, in case something arrived, the fifo will be read
  * @param char* fifo path
  * @param uint8_t** buffer to store received data
