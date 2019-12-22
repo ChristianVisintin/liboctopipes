@@ -57,8 +57,8 @@
  * - read from pipe
  * - write to pipe
  * Functions covered by this test:
- * - octopipes_init
- * - octopipes_cleanup
+ * - pipe_create
+ * - pipe_delete
  * - pipe_send
  * - pipe_receive
  * NOTE: This test JUST tests the PIPES, not the protocol!
@@ -193,7 +193,7 @@ int main_child(const char* txPipe, const char* rxPipe) {
 }
 
 int main(int argc, char** argv) {
-  printf(PROGRAM_NAME "liboctopipes Build: " OCTOPIPES_LIB_VERSION "\n");
+  printf(PROGRAM_NAME " liboctopipes Build: " OCTOPIPES_LIB_VERSION "\n");
   int opt;
   char* txPipe = NULL;
   char* rxPipe = NULL;
