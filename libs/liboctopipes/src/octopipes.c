@@ -104,6 +104,29 @@ OctopipesError octopipes_cleanup(OctopipesClient* client) {
 }
 
 /**
+ * @brief cleanup an OctopipesMessage struct
+ * @param OctopipesMessage*
+ * @return OctopipesError
+ */
+
+OctopipesError octopipes_cleanup_message(OctopipesMessage* message) {
+  if (message == NULL) {
+    return OCTOPIPES_ERROR_SUCCESS;
+  }
+  if (message->origin_size > 0 && message->origin != NULL) {
+    free(message->origin);
+  }
+  if (message->remote_size > 0 && message->remote != NULL) {
+    free(message->remote);
+  }
+  if (message->data_size > 0 && message->data != NULL) {
+    free(message->data);
+  }
+  free(message);
+  return OCTOPIPES_ERROR_SUCCESS;
+}
+
+/**
  * @brief start the octopipes client loop thread
  * @param OctopipesClient
  * @return OctopipeError
@@ -174,15 +197,14 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   //Data
   subscribe_message->data = octopipes_cap_prepare_subscribe(groups, groups_amount, (size_t*) &subscribe_message->data_size);
   if (subscribe_message->data == NULL) {
-    free(subscribe_message);
+    octopipes_cleanup_message(subscribe_message);
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
   //Encode message
   size_t out_data_size;
   uint8_t* out_data;
   OctopipesError rc = octopipes_encode(subscribe_message, &out_data, &out_data_size);
-  free(subscribe_message->data);
-  free(subscribe_message);
+  octopipes_cleanup_message(subscribe_message);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
   }
@@ -333,7 +355,7 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
   uint8_t* out_data;
   OctopipesError rc = octopipes_encode(message, &out_data, &out_data_size);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
-    free(message);
+    octopipes_cleanup_message(message);
     return rc;
   }
   //Write to FIFO
@@ -343,7 +365,7 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
     client->on_sent(message);
   }
   //Call on sent
-  free(message);
+  octopipes_cleanup_message(message);
   free(out_data);
   return rc;
 }
@@ -488,7 +510,7 @@ void* octopipes_loop(void* args) {
         if (client->on_received != NULL) {
           client->on_received(message); //@! Success
         }
-        free(message);
+        octopipes_cleanup_message(message);
       } else {
         //@! Report error
         if (client->on_receive_error != NULL) {
