@@ -32,7 +32,7 @@ uint8_t* octopipes_cap_prepare_assign(OctopipesCapError error, const char* fifo_
 uint8_t* octopipes_cap_prepare_unsubscribe(size_t* data_size);
 //Parse
 OctopipesCapMessage octopipes_cap_get_message(const uint8_t* data, const size_t data_size);
-OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t data_size, char** groups, size_t* groups_amount);
+OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t data_size, char*** groups, size_t* groups_amount);
 OctopipesError octopipes_cap_parse_assign(const uint8_t* data, const size_t data_size, OctopipesCapError* error, char** fifo_tx, char** fifo_rx);
 OctopipesError octopipes_cap_parse_unsubscribe(const uint8_t* data, const size_t data_size);
 

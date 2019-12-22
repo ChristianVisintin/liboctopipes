@@ -131,12 +131,12 @@ OctopipesCapMessage octopipes_cap_get_message(const uint8_t* data, const size_t 
  * @brief parse a subscribe package
  * @param uint8_t* data in
  * @param size_t data in size
- * @param char** groups will contain the groups to subscribe to
+ * @param char*** groups will contain the groups to subscribe to
  * @param size_t* amount of groups
  * @return OctopipesError
  */
 
-OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t data_size, char** groups, size_t* groups_amount) {
+OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t data_size, char*** groups, size_t* groups_amount) {
   if (data_size < 2) {
     return OCTOPIPES_ERROR_BAD_PACKET;
   }
@@ -147,7 +147,7 @@ OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t d
   size_t data_ptr = 2; //Start from first group size
   size_t curr_group = 0;
   //Allocate groups
-  groups = (char**) malloc(sizeof(char*) * *groups_amount);
+  *groups = (char**) malloc(sizeof(char*) * *groups_amount);
   while (data_ptr < data_size && curr_group < *groups_amount) {
     //Read group name size
     const size_t this_group_size = data[data_ptr++];
@@ -158,9 +158,9 @@ OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t d
       OctopipesError rc = (this_group == NULL) ? OCTOPIPES_ERROR_BAD_ALLOC : OCTOPIPES_ERROR_BAD_PACKET;
       //Free groups
       for (size_t i = 0; i < curr_group + 1; i++) {
-        free(groups[i]);
+        free(*groups[i]);
       }
-      free(groups);
+      free(*groups);
       return rc; //Not enough bytes
     }
     //Copy group to group string
@@ -168,7 +168,7 @@ OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t d
     //Add null terminator to group
     this_group[this_group_size] = 0x00;
     //Assign this group to groups
-    groups[curr_group] = this_group;
+    *groups[curr_group] = this_group;
     //Increment data ptr of this groups size
     data_ptr += this_group_size;
     //Increment current group
