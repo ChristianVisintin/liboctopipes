@@ -29,7 +29,7 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h> 
+#include <unistd.h>
 
 /**
  * @brief create the fifo described in the fifo parameter
@@ -38,7 +38,7 @@
  */
 
 OctopipesError pipe_create(const char* fifo) {
-  return (mkfifo(fifo, 666) == 0) ? OCTOPIPES_ERROR_SUCCESS : OCTOPIPES_ERROR_OPEN_FAILED;
+  return (mkfifo(fifo, 0666) == 0) ? OCTOPIPES_ERROR_SUCCESS : OCTOPIPES_ERROR_OPEN_FAILED;
 }
 
 /**
@@ -72,13 +72,15 @@ OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size,
     //Open failed
     return OCTOPIPES_ERROR_OPEN_FAILED;
   }
-  fds[0].events = POLLIN | POLLRDBAND;
+  fds[0].events = POLLIN;
+  int time_elapsed = 0;
   //Poll FIFO
-  while (1) {
-    ret = poll(fds, 1, timeout);
+  while (time_elapsed < timeout) {
+    ret = poll(fds, 1, 50);
+    time_elapsed += 100;
     if (ret > 0) {
       // Fifo is available to be read
-      if ((fds[0].revents & POLLRDBAND) || (fds[0].revents & POLLIN) ) {
+      if (fds[0].revents & POLLIN) {
         //Read from FIFO
         uint8_t buffer[2048];
         const size_t bytes_read = read(fds[0].fd, buffer, 2048);
@@ -106,7 +108,11 @@ OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size,
       }
     } else if (ret == 0) {
       //Break if no data is available
-      break;
+      if (*data == NULL) {
+        continue; //Keep waiting for data
+      } else {
+        break; //Exit
+      }
     } else { //Ret == -1
       if (errno == EAGAIN) {
         //Break if no data is available
@@ -149,13 +155,13 @@ OctopipesError pipe_send(const char* fifo, const uint8_t* data, const size_t dat
     //Open failed
     return OCTOPIPES_ERROR_OPEN_FAILED;
   }
-  fds[0].events = POLLOUT | POLLWRBAND;
+  fds[0].events = POLLOUT;
   //Poll FIFO
   while (total_bytes_written < data_size) {
     ret = poll(fds, 1, timeout);
     if (ret > 0) {
       // Fifo is available to be written
-      if ((fds[0].revents & POLLOUT) || (fds[0].revents & POLLWRBAND) ) {
+      if (fds[0].revents & POLLOUT) {
         //Write data to FIFO
         const size_t remaining_bytes = data_size - total_bytes_written;
         //It's not obvious the data will be written in one shot, so just in case sum total_bytea_written to buffer index and write only remaining bytes
@@ -169,5 +175,8 @@ OctopipesError pipe_send(const char* fifo, const uint8_t* data, const size_t dat
     }
   }
   close(fds[0].fd);
+  if (total_bytes_written == data_size) {
+    rc = OCTOPIPES_ERROR_SUCCESS;
+  }
   return rc;
 }
