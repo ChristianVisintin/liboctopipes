@@ -56,6 +56,11 @@
  * - crating new pipes
  * - read from pipe
  * - write to pipe
+ * Functions covered by this test:
+ * - octopipes_init
+ * - octopipes_cleanup
+ * - pipe_send
+ * - pipe_receive
  * NOTE: This test JUST tests the PIPES, not the protocol!
  * NOTE: This test forks itself to create a dummy client
  */

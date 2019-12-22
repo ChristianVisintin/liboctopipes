@@ -21,8 +21,8 @@
  * SOFTWARE.
 **/
 
-#ifndef PIPES_H
-#define PIPES_H
+#ifndef OCTOPIPES_PIPES_H
+#define OCTOPIPES_PIPES_H
 
 #include "types.h"
 
