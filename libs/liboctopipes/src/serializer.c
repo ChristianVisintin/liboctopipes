@@ -109,7 +109,7 @@ OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, Oct
     //Checksum
     message_ptr->checksum = data[data_ptr++];
     //Verify STX
-    if (data[data_ptr] != STX) {
+    if (data[data_ptr++] != STX) {
       goto decode_bad_packet;
     }
     //Read data
@@ -206,7 +206,7 @@ OctopipesError octopipes_encode(OctopipesMessage* message, uint8_t** data, size_
     //Origin / origin_size
     out_data[data_ptr++] = message->origin_size;
     memcpy(out_data + data_ptr, message->origin, message->origin_size);
-    out_data += message->origin_size;
+    data_ptr += message->origin_size;
     //Remote / remote size
     out_data[data_ptr++] = message->remote_size;
     memcpy(out_data + data_ptr, message->remote, message->remote_size);
@@ -231,11 +231,12 @@ OctopipesError octopipes_encode(OctopipesMessage* message, uint8_t** data, size_
     out_data[data_ptr++] = STX;
     //Write data
     memcpy(out_data + data_ptr, message->data, message->data_size);
+    data_ptr += message->data_size;
     //Write ETX
     out_data[data_ptr++] = ETX;
     //Checksum as last thing
     message->checksum = 0;
-    if ((message->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM) != 0) {
+    if ((message->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM) == 0) {
       message->checksum = calculate_checksum(message);
     }
     out_data[checksum_ptr] = message->checksum;

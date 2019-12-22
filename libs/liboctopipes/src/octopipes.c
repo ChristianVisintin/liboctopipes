@@ -479,7 +479,7 @@ void* octopipes_loop(void* args) {
     //Check if there are available messages to be read
     uint8_t* data_in;
     size_t data_in_size;
-    OctopipesError rc = pipe_receive(client->rx_pipe, &data_in, &data_in_size, 500); //500 ms
+    OctopipesError rc = pipe_receive(client->rx_pipe, &data_in, &data_in_size, 5000); //5000 ms
     if (rc == OCTOPIPES_ERROR_SUCCESS) {
       //Parse data
       OctopipesMessage* message;
