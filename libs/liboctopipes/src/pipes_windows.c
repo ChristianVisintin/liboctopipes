@@ -21,15 +21,34 @@
  * SOFTWARE.
 **/
 
+#ifdef _WIN32
+
+#pragma message("-Warning: octopipes is not currently supported on Windows systems")
+
 #include <octopipes/pipes.h>
 
-#include <fcntl.h>
-#include <poll.h>
-#include <string.h>
-#include <sys/errno.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+#ifdef _IA64_
+#pragma warning (disable: 4311)
+#pragma warning (disable: 4312)
+#endif
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#include <tchar.h>
+#include <windows.h>
+
+typedef struct { 
+  OVERLAPPED oOverlap; 
+  HANDLE hPipeInst; 
+  TCHAR chRequest[BUFSIZE]; 
+  DWORD cbRead;
+  TCHAR chReply[BUFSIZE];
+  DWORD cbToWrite; 
+  DWORD dwState; 
+  BOOL fPendingIO; 
+} PIPEINST, *LPPIPEINST; 
 
 /**
  * @brief create the fifo described in the fifo parameter
@@ -38,7 +57,7 @@
  */
 
 OctopipesError pipe_create(const char* fifo) {
-  return (mkfifo(fifo, 0666) == 0) ? OCTOPIPES_ERROR_SUCCESS : OCTOPIPES_ERROR_OPEN_FAILED;
+  return OCTOPIPES_ERROR_SUCCESS;
 }
 
 /**
@@ -48,7 +67,7 @@ OctopipesError pipe_create(const char* fifo) {
  */
 
 OctopipesError pipe_delete(const char* fifo) {
-  return (unlink(fifo) == 0) ? OCTOPIPES_ERROR_SUCCESS : OCTOPIPES_ERROR_OPEN_FAILED;
+  return OCTOPIPES_ERROR_SUCCESS;
 }
 
 /**
@@ -61,6 +80,40 @@ OctopipesError pipe_delete(const char* fifo) {
  */
 
 OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size, const int timeout) {
+  /*
+  PIPEINST Pipe;
+  HANDLE hEvent;
+
+  hEvents = CreateEvent( 
+    NULL,    // default security attribute 
+    TRUE,    // manual-reset event 
+    TRUE,    // initial state = signaled 
+    NULL);   // unnamed event object
+  
+  if (hEvent == NULL) {
+    return OCTOPIPES_ERROR_OPEN_FAILED;
+  }
+
+  Pipe.oOverlap.hEvent = hEvent;
+  Pipe.hPipeInst = CreateNamedPipe( 
+    lpszPipename,            // pipe name 
+    PIPE_ACCESS_DUPLEX |     // read/write access 
+    FILE_FLAG_OVERLAPPED,    // overlapped mode 
+    PIPE_TYPE_MESSAGE |      // message-type pipe 
+    PIPE_READMODE_MESSAGE |  // message-read mode 
+    PIPE_WAIT,               // blocking mode 
+    INSTANCES,               // number of instances 
+    BUFSIZE*sizeof(TCHAR),   // output buffer size 
+    BUFSIZE*sizeof(TCHAR),   // input buffer size 
+    PIPE_TIMEOUT,            // client time-out 
+    NULL);                   // default security attributes
+
+  if (Pipe.hPipeInst == INVALID_HANDLE_VALUE) {
+    return OCTOPIPES_ERROR_OPEN_FAILED;
+  }
+
+  Pipe.dwState = Pipe.fPendingIO ?  CONNECTING_STATE : READING_STATE;
+  
   struct pollfd fds[1];
   int ret;
   OctopipesError rc = OCTOPIPES_ERROR_NO_DATA_AVAILABLE;
@@ -132,7 +185,8 @@ OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size,
     *data = NULL;
     *data_size = 0;
   }
-  return rc;
+  */
+  return OCTOPIPES_ERROR_READ_FAILED;
 }
 
 /**
@@ -145,38 +199,7 @@ OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size,
  */
 
 OctopipesError pipe_send(const char* fifo, const uint8_t* data, const size_t data_size, const int timeout) {
-  struct pollfd fds[1];
-  int ret;
-  OctopipesError rc = OCTOPIPES_ERROR_NO_DATA_AVAILABLE;
-  size_t total_bytes_written = 0; //Must be == data_size to succeed
-  //Open FIFO
-  fds[0].fd = open(fifo, O_WRONLY | O_NONBLOCK);
-  if (fds[0].fd == -1) {
-    //Open failed
-    return OCTOPIPES_ERROR_OPEN_FAILED;
-  }
-  fds[0].events = POLLOUT;
-  //Poll FIFO
-  while (total_bytes_written < data_size) {
-    ret = poll(fds, 1, timeout);
-    if (ret > 0) {
-      // Fifo is available to be written
-      if (fds[0].revents & POLLOUT) {
-        //Write data to FIFO
-        const size_t remaining_bytes = data_size - total_bytes_written;
-        //It's not obvious the data will be written in one shot, so just in case sum total_bytea_written to buffer index and write only remaining bytes
-        const size_t bytes_written = write(fds[0].fd, data + total_bytes_written, remaining_bytes);
-        //Then sum bytes written to total bytes written
-        total_bytes_written += bytes_written;
-      }
-    } else {
-      //Could not write or nobody was listening
-      rc = OCTOPIPES_ERROR_WRITE_FAILED;
-    }
-  }
-  close(fds[0].fd);
-  if (total_bytes_written == data_size) {
-    rc = OCTOPIPES_ERROR_SUCCESS;
-  }
-  return rc;
+  return OCTOPIPES_ERROR_READ_FAILED;
 }
+
+#endif
