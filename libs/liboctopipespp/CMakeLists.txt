@@ -4,11 +4,13 @@ project(liboctopipes VERSION 0.1.0)
 set (ROOT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 set (ROOT_TESTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests/")
 set (OCTOPIPES_C_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../liboctopipes/")
+set (OCTOPIPES_C_DIR_BIN "${CMAKE_CURRENT_BINARY_DIR}/liboctopipes/")
 
-add_subdirectory(OCTOPIPES_C_DIR)
+add_subdirectory(${OCTOPIPES_C_DIR} ${OCTOPIPES_C_DIR_BIN})
 
 include_directories(
   "${CMAKE_CURRENT_SOURCE_DIR}/include/"
+  "${OCTOPIPES_C_DIR}/include/"
 )
 #Includes
 file(GLOB INCLUDE_FILES
@@ -20,17 +22,13 @@ file(GLOB LIBOCTOPIPESPP_SRC
   "${ROOT_SOURCE_DIR}/*.cpp"
 )
 
-#Clients
-set (CLIENT_SEND_SRC "${ROOT_CLIENT_DIR}/octopipes_send.c")
-set (CLIENT_SUB_SRC "${ROOT_CLIENT_DIR}/octopipes_sub.c")
-
 #Tests source
-file(GLOB PIPES_TEST_SRC
-  "${ROOT_TESTS_DIR}/pipes/*.c"
-)
-file(GLOB PARSER_TEST_SRC
-  "${ROOT_TESTS_DIR}/parser/*.c"
-)
+#file(GLOB PIPES_TEST_SRC
+#  "${ROOT_TESTS_DIR}/pipes/*.c"
+#)
+#file(GLOB PARSER_TEST_SRC
+#  "${ROOT_TESTS_DIR}/parser/*.c"
+#)
 
 set(CXX_FLAGS "-g -Wall")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall")
@@ -39,12 +37,12 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_BUILD_TYPE RELEASE)
 
 add_library(octopipespp_shared SHARED ${LIBOCTOPIPESPP_SRC})
-set_target_properties(octopipes_shared PROPERTIES OUTPUT_NAME octopipespp)
-set_target_properties(octopipes_shared PROPERTIES VERSION 0.1.0)
-target_link_libraries(octopipes_shared -lpthread -loctopipes)
+set_target_properties(octopipespp_shared PROPERTIES OUTPUT_NAME octopipespp)
+set_target_properties(octopipespp_shared PROPERTIES VERSION 0.1.0)
+target_link_libraries(octopipespp_shared -lpthread octopipes_shared)
 add_library(octopipespp_static STATIC ${LIBOCTOPIPESPP_SRC})
 set_target_properties(octopipespp_static PROPERTIES OUTPUT_NAME octopipespp)
-target_link_libraries(octopipespp_static -lpthread -loctopipes)
+target_link_libraries(octopipespp_static -lpthread octopipes_static)
 
 #Build tests
 #add_executable(test_pipes ${PIPES_TEST_SRC})

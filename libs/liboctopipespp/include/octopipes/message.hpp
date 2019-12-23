@@ -32,8 +32,7 @@ class Message {
 
 public:
   Message();
-  Message(const ProtocolVersion version, const std::string& origin, const std::string& remote, const uint8_t* payload, const size_t payload_size, const Options options);
-  Message(const ProtocolVersion version, const std::string& origin, const std::string& remote, const uint8_t* payload, const size_t payload_size, const Options options, const uint8_t checksum);
+  Message(const ProtocolVersion version, const std::string& origin, const std::string& remote, const uint8_t* payload, const size_t payload_size, const Options options, const int ttl);
   ~Message();
   Error decodeData(const uint8_t* data, size_t data_size);
   Error encodeData(uint8_t*& data, size_t& data_size);
