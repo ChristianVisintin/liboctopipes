@@ -24,10 +24,13 @@
 #include <octopipes/octopipes.h>
 
 #include <getopt.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
+
+#ifndef _WIN32
+#include <signal.h>
+#endif
 
 #define DEFAULT_CAP_PATH "/usr/share/octopipes/pipes/cap.fifo"
 #define DEFAULT_CLIENT_ID "octopipes-client"
@@ -88,6 +91,8 @@ void on_error(const OctopipesError error) {
   printf("ERROR: %s\n", octopipes_get_error_desc(error));
 }
 
+#ifndef _WIN32
+
 /**
  * @function handleSigterm
  * @description: terminate main loop in order to terminate einklient
@@ -97,6 +102,8 @@ void on_error(const OctopipesError error) {
 void handleSigterm(int s) {
   sigterm_called = true;
 }
+
+#endif
 
 int main(int argc, char** argv) {
   int opt;
@@ -150,12 +157,14 @@ int main(int argc, char** argv) {
   }
 
   //SIGTERM handler
+#ifndef _WIN32
   struct sigaction sigTermHandler;
   sigTermHandler.sa_handler = handleSigterm;
   sigemptyset(&sigTermHandler.sa_mask);
   sigTermHandler.sa_flags = 0;
   sigaction(SIGTERM, &sigTermHandler, NULL);
   sigaction(SIGINT, &sigTermHandler, NULL);
+#endif
 
   //Initialize client
   OctopipesClient* client;

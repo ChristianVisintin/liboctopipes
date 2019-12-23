@@ -24,7 +24,6 @@
 #include <octopipes/octopipes.h>
 
 #include <getopt.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
