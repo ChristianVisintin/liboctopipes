@@ -55,9 +55,10 @@ enum class CapMessage {
 };
 
 enum class CapError {
-  ERROR_SUCCESS = 0,
-  ERROR_NAME_ALREADY_TAKEN = 1,
-  ERROR_FS = 2
+  SUCCESS = 0,
+  NAME_ALREADY_TAKEN = 1,
+  FS = 2,
+  UNKNOWN = 255
 };
 
 enum class Options {

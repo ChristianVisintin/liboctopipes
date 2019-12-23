@@ -28,7 +28,7 @@
 
 #include <string.h>
 
-#define DEFAULT_TTL 255
+#define DEFAULT_TTL 0
 
 //Private properties and functions
 //Threads

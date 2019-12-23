@@ -41,20 +41,26 @@ public:
   Error stopLoop();
   Error subscribe(const std::list<std::string>& groups, CapError& assignment_error);
   Error unsubscribe();
-  Error octopipes_send(const std::string& remote, const void* data, const uint64_t data_size);
-  Error octopipes_send_ex(const std::string& remote, const void* data, const uint64_t data_size, const uint8_t ttl, const Options options);
+  Error send(const std::string& remote, const void* data, const uint64_t data_size);
+  Error sendEx(const std::string& remote, const void* data, const uint64_t data_size, const uint8_t ttl, const Options options);
   //Callbacks
-  Error octopipes_set_received_cb(std::function<void(const Message*)> on_received);
-  Error octopipes_set_sent_cb(std::function<void(Message*)> on_sent);
-  Error octopipes_set_receive_error_cb(std::function<void(const Error)> on_receive_error);
-  Error octopipes_set_subscribed_cb(std::function<void()> on_subscribed);
-  Error octopipes_set_unsubscribed_cb(std::function<void()> on_unsubscribed);
+  Error setReceivedCB(std::function<void(const Message*)> on_received);
+  Error setSentCB(std::function<void(Message*)> on_sent);
+  Error setReceive_errorCB(std::function<void(const Error)> on_receive_error);
+  Error setSubscribedCB(std::function<void()> on_subscribed);
+  Error setUnsubscribedCB(std::function<void()> on_unsubscribed);
   //Error
-  static const std::string get_error_desc(const Error error);
+  static const std::string getErrorDesc(const Error error);
 
 private:
   //Class attributes
   void* octopipes_client;
+  //Callbacks
+  std::function<void(const Message*)> on_received;
+  std::function<void(Message*)> on_sent;
+  std::function<void(const Error)> on_receive_error;
+  std::function<void()> on_subscribed;
+  std::function<void()> on_unsubscribed;
 
 };
 
