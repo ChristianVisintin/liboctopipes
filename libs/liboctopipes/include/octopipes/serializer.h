@@ -24,11 +24,19 @@
 #ifndef OCTOPIPES_SERIALIZER_H
 #define OCTOPIPES_SERIALIZER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "types.h"
 
 //Encoding/decoding
 OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, OctopipesMessage** message);
 OctopipesError octopipes_encode(OctopipesMessage* message, uint8_t** data, size_t* data_size);
 uint8_t calculate_checksum(const OctopipesMessage* message);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

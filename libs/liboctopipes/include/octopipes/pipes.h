@@ -24,6 +24,10 @@
 #ifndef OCTOPIPES_PIPES_H
 #define OCTOPIPES_PIPES_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "types.h"
 
 //I/O
@@ -31,5 +35,9 @@ OctopipesError pipe_create(const char* fifo);
 OctopipesError pipe_delete(const char* fifo);
 OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size, const int timeout);
 OctopipesError pipe_send(const char* fifo, const uint8_t* data, const size_t data_size, const int timeout);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

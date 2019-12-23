@@ -28,6 +28,10 @@
 #include <pthread.h>
 #include <stdlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum OctopipesError {
   OCTOPIPES_ERROR_SUCCESS,
   OCTOPIPES_ERROR_UNINITIALIZED,
@@ -111,5 +115,9 @@ typedef enum OctopipesCapError {
   OCTOPIPES_CAP_ERROR_NAME_ALREADY_TAKEN = 1,
   OCTOPIPES_CAP_ERROR_FS = 2
 } OctopipesCapError;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
