@@ -21,7 +21,7 @@
  * SOFTWARE.
 **/
 
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__NetBSD__) || defined(__gnu_linux_) || defined(__linux_) || defined(__APPLE__)
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__NetBSD__) || defined(__gnu_linux__) || defined(__linux__) || defined(__APPLE__)
 
 #include <octopipes/pipes.h>
 

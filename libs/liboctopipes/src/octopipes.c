@@ -534,6 +534,11 @@ void* octopipes_loop(void* args) {
         if (client->on_received != NULL) {
           client->on_received(message); //@! Success
         }
+        //If RCK, send ACK
+        if ((message->options & OCTOPIPES_OPTIONS_REQUIRE_ACK) != 0) {
+          //Prepare and send ACK message
+          octopipes_send_ex(client, message->origin, NULL, 0, 255, OCTOPIPES_OPTIONS_ACK);
+        }
         octopipes_cleanup_message(message);
       } else {
         //@! Report error

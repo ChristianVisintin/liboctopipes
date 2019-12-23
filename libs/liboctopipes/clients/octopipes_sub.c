@@ -27,6 +27,7 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #define DEFAULT_CAP_PATH "/usr/share/octopipes/pipes/cap.fifo"
 #define DEFAULT_CLIENT_ID "octopipes-client"
@@ -123,12 +124,14 @@ int main(int argc, char** argv) {
     }
   }
 
-  groups_count = (argc - optind - 1);
+  groups_count = (argc - optind - 1) < 0 ? 0 : (argc - optind - 1);
   //Allocate groups
-  groups = (char**) malloc(sizeof(char**) * groups_count);
-  if (groups == NULL) {
-    printf("Could not allocate more memory for groups container\n");
-    return 1;
+  if (groups_count > 0) {
+    groups = (char**) malloc(sizeof(char**) * groups_count);
+    if (groups == NULL) {
+      printf("Could not allocate more memory for groups container\n");
+      return 1;
+    }
   }
   //Get subscribptions
   for (size_t i; optind < argc; optind++) {
