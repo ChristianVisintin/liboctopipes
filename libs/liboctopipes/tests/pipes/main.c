@@ -193,6 +193,10 @@ int main_child(const char* txPipe, const char* rxPipe) {
 }
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+#pragma message("-Warning: test pipes doesn't run on Windows at the moment")
+  return 0;
+#else
   printf(PROGRAM_NAME " liboctopipes Build: " OCTOPIPES_LIB_VERSION "\n");
   int opt;
   char* txPipe = NULL;
@@ -264,4 +268,5 @@ int main(int argc, char** argv) {
     printf("Child process exited with code %d\n", ret);
   }
   return ret;
+#endif
 }
