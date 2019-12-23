@@ -85,7 +85,7 @@ OctopipesError octopipes_cleanup(OctopipesClient* client) {
     return OCTOPIPES_ERROR_SUCCESS;
   }
   //Disconnect if not disconnected yet
-  if (client->state == OCTOPIPES_STATE_SUBSCRIBED) {
+  if (client->state == OCTOPIPES_STATE_SUBSCRIBED || client->state == OCTOPIPES_STATE_RUNNING) {
     OctopipesError rc;
     if ((rc = octopipes_unsubscribe(client)) != OCTOPIPES_ERROR_SUCCESS) {
       return rc;
