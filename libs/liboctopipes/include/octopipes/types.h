@@ -107,9 +107,9 @@ typedef enum OctopipesCapMessage {
 } OctopipesCapMessage;
 
 typedef enum OctopipesCapError {
-  OCTOPIPES_CAP_ERROR_SUCCESS,
-  OCTOPIPES_CAP_ERROR_NAME_ALREADY_TAKEN,
-  OCTOPIPES_CAP_ERROR_FS
+  OCTOPIPES_CAP_ERROR_SUCCESS = 0,
+  OCTOPIPES_CAP_ERROR_NAME_ALREADY_TAKEN = 1,
+  OCTOPIPES_CAP_ERROR_FS = 2
 } OctopipesCapError;
 
 #endif
