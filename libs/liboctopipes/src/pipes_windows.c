@@ -42,9 +42,9 @@
 typedef struct { 
   OVERLAPPED oOverlap; 
   HANDLE hPipeInst; 
-  TCHAR chRequest[BUFSIZE]; 
+  TCHAR chRequest[2048]; 
   DWORD cbRead;
-  TCHAR chReply[BUFSIZE];
+  TCHAR chReply[2048];
   DWORD cbToWrite; 
   DWORD dwState; 
   BOOL fPendingIO; 
