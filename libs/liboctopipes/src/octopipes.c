@@ -185,10 +185,17 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   if (subscribe_message == NULL) {
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
+  subscribe_message->origin = NULL;
+  subscribe_message->remote = NULL;
+  subscribe_message->data = NULL;
   //Set origin as client
   subscribe_message->version = client->protocol_version;
   subscribe_message->origin_size = client->client_id_size;
   subscribe_message->origin = (char*) malloc(sizeof(char) * (client->client_id_size + 1));
+  if (subscribe_message->origin == NULL) {
+    octopipes_cleanup_message(subscribe_message);
+    return OCTOPIPES_ERROR_BAD_ALLOC;
+  }
   memcpy(subscribe_message->origin, client->client_id, client->client_id_size);
   subscribe_message->origin[client->client_id_size] = 0x00;
   //Server is 0
@@ -261,6 +268,9 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   OctopipesError rc;
   //Prepare message
   OctopipesMessage* subscribe_message = (OctopipesMessage*) malloc(sizeof(OctopipesMessage));
+  subscribe_message->origin = NULL;
+  subscribe_message->remote = NULL;
+  subscribe_message->data = NULL;
   if (subscribe_message == NULL) {
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
@@ -268,6 +278,10 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   subscribe_message->version = client->protocol_version;
   subscribe_message->origin_size = client->client_id_size;
   subscribe_message->origin = (char*) malloc(sizeof(char) * (subscribe_message->origin_size + 1));
+  if (subscribe_message->origin == NULL) {
+    octopipes_cleanup_message(subscribe_message);
+    return OCTOPIPES_ERROR_BAD_ALLOC;
+  }
   if (subscribe_message->origin == NULL) {
     octopipes_cleanup_message(subscribe_message);
     return OCTOPIPES_ERROR_BAD_ALLOC;
@@ -348,6 +362,9 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
   if (message == NULL) {
     return OCTOPIPES_ERROR_BAD_ALLOC;
   }
+  message->origin = NULL;
+  message->remote = NULL;
+  message->data = NULL;
   //Fill message structure
   message->version = client->protocol_version;
   message->origin_size = client->client_id_size;

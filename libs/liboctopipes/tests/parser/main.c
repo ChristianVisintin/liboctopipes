@@ -81,6 +81,9 @@ int test_endecoding() {
     payload[i] = i;
   }
   OctopipesMessage* message = (OctopipesMessage*) malloc(sizeof(OctopipesMessage));
+  message->origin = NULL;
+  message->remote = NULL;
+  message->data = NULL;
   //Fill message fields
   message->version = OCTOPIPES_VERSION_1;
   message->origin = ORIGIN;
