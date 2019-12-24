@@ -24,6 +24,11 @@
 #ifndef OCTOPIPESPP_HPP
 #define OCTOPIPESPP_HPP
 
+//Version defines
+#define OCTOPIPESPP_LIB_VERSION "0.1.0"
+#define OCTOPIPESPP_LIB_VERSION_MAJOR 0
+#define OCTOPIPESPP_LIB_VERSION_MINOR 1
+
 #include "typespp.hpp"
 #include "message.hpp"
 

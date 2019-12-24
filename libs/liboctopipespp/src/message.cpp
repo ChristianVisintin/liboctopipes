@@ -118,6 +118,7 @@ Error Message::decodeData(const uint8_t* data, size_t data_size) {
   if ((rc = octopipes_decode(data, data_size, &msg)) != OCTOPIPES_ERROR_SUCCESS) {
     return translate_octopipes_error(rc);
   }
+  this->version = static_cast<ProtocolVersion>(msg->version);
   this->origin = msg->origin;
   this->remote = msg->remote;
   this->checksum = msg->checksum;
@@ -146,6 +147,9 @@ Error Message::encodeData(uint8_t*& data, size_t& data_size) {
   if (msg == NULL) {
     return Error::BAD_ALLOC;
   }
+  msg->origin = NULL;
+  msg->remote = NULL;
+  msg->data = NULL;
   //Version
   msg->version = static_cast<OctopipesVersion>(version);
   //Origin
@@ -181,6 +185,7 @@ Error Message::encodeData(uint8_t*& data, size_t& data_size) {
   //If checksum has to be calculated, calc checksum
   if (!getOption(Options::IGNORE_CHECKSUM)) {
     msg->checksum = calculate_checksum(msg);
+    this->checksum = msg->checksum;
   }
   //Encode message
   uint8_t* out_data;

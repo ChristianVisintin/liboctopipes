@@ -23,18 +23,15 @@ file(GLOB LIBOCTOPIPESPP_SRC
 )
 
 #Tests source
-#file(GLOB PIPES_TEST_SRC
-#  "${ROOT_TESTS_DIR}/pipes/*.c"
-#)
-#file(GLOB PARSER_TEST_SRC
-#  "${ROOT_TESTS_DIR}/parser/*.c"
-#)
+file(GLOB PARSER_TEST_SRC
+  "${ROOT_TESTS_DIR}/parser/*.cpp"
+)
 
 set(CXX_FLAGS "-g -Wall")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -g")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall")
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_BUILD_TYPE RELEASE)
+set(CMAKE_BUILD_TYPE DEBUG)
 
 add_library(octopipespp_shared SHARED ${LIBOCTOPIPESPP_SRC})
 set_target_properties(octopipespp_shared PROPERTIES OUTPUT_NAME octopipespp)
@@ -45,16 +42,12 @@ set_target_properties(octopipespp_static PROPERTIES OUTPUT_NAME octopipespp)
 target_link_libraries(octopipespp_static -lpthread octopipes_static)
 
 #Build tests
-#add_executable(test_pipes ${PIPES_TEST_SRC})
-#target_link_libraries(test_pipes octopipes_shared -lpthread)
-#add_executable(test_parser ${PARSER_TEST_SRC})
-#target_link_libraries(test_parser octopipes_shared -lpthread)
-#if(CMAKE_COMPILER_IS_GNUCXX)
-#  target_compile_options(test_pipes PUBLIC "--coverage")
-#  target_compile_options(test_parser PUBLIC "--coverage")
-#  target_link_libraries(test_parser gcov)
-#  target_link_libraries(test_pipes gcov)
-#endif()
+add_executable(test_parserpp ${PARSER_TEST_SRC})
+target_link_libraries(test_parserpp octopipespp_shared)
+if(CMAKE_COMPILER_IS_GNUCXX)
+  target_compile_options(test_parserpp PUBLIC "--coverage")
+  target_link_libraries(test_parserpp gcov)
+endif()
 #Install rules
 install(TARGETS octopipespp_shared CONFIGURATIONS Release LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)
 install(TARGETS octopipespp_static CONFIGURATIONS Release ARCHIVE DESTINATION lib)

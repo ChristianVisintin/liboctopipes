@@ -312,6 +312,8 @@ Error translate_octopipes_error(OctopipesError error) {
       return Error::THREAD;
     case OCTOPIPES_ERROR_UNINITIALIZED:
       return Error::UNINITIALIZED;
+    case OCTOPIPES_ERROR_UNSUPPORTED_VERSION:
+      return Error::UNSUPPORTED_VERSION;
     case OCTOPIPES_ERROR_UNKNOWN_ERROR:
     default:
       return Error::UNKNOWN_ERROR;
@@ -334,6 +336,48 @@ CapError translate_cap_error(OctopipesCapError error) {
       return CapError::FS;
     default:
       return CapError::UNKNOWN;
+  }
+}
+
+/**
+ * @brief get error description from the provided error code
+ * @param Error
+ * @return const std::string
+ */
+
+const std::string Client::getErrorDesc(const Error error) {
+  switch (error) {
+    case Error::BAD_ALLOC:
+      return "Could not allocate more memory in the heap";
+    case Error::BAD_CHECKSUM:
+      return "The last packet has a bad checksum and the ignore checksum flag is set to 0";
+    case Error::BAD_PACKET:
+      return "The packet syntax is invalid or is unexpected";
+    case Error::CAP_TIMEOUT:
+      return "The CAP timeout. The request hasn't been fulfilled in time.";
+    case Error::NO_DATA_AVAILABLE:
+      return "There's no data available to be read";
+    case Error::NOT_SUBSCRIBED:
+      return "The client is not subscribed yet to Octopipes server. Sending of messages to server is allowed only using the CAP.";
+    case Error::NOT_UNSUBSCRIBED:
+      return "This operation is not permitted, since the client isn't unsubscribed";
+    case Error::OPEN_FAILED:
+      return "Could not open the FIFO";
+    case Error::READ_FAILED:
+      return "An error occurred while trying to read from FIFO";
+    case Error::SUCCESS:
+      return "Not an error";
+    case Error::THREAD:
+      return "Could not start loop thread";
+    case Error::UNINITIALIZED:
+      return "The OctopipesClient must be initialized calling octopipes_init() first";
+    case Error::UNSUPPORTED_VERSION:
+      return "This protocol version is unsupported by Octopipes Version " OCTOPIPES_LIB_VERSION;
+    case Error::WRITE_FAILED:
+      return "Could not write data to FIFO";
+    case Error::UNKNOWN_ERROR:
+    default:
+      return "Unknown error";
   }
 }
 
