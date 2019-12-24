@@ -278,9 +278,36 @@ Error Client::setUnsubscribedCB(std::function<void(const Client*)> on_unsubscrib
  * @return void*
  */
 
-void* Client::getUserData() {
+void* Client::getUserData() const {
   return user_data;
 }
+
+std::string Client::getClientId() const {
+  OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
+  return client->client_id;
+}
+
+std::string Client::getCapPath() const {
+  OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
+  return client->common_access_pipe;
+}
+
+std::string Client::getPipeTx() const {
+  OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
+  if (client->tx_pipe == NULL) {
+    return "";
+  }
+  return client->tx_pipe;
+}
+
+std::string Client::getPipeRx() const {
+  OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
+  if (client->rx_pipe == NULL) {
+    return "";
+  }
+  return client->rx_pipe;
+}
+
 
 /**
  * @brief get Octopipes++ error from OctopipesError

@@ -37,13 +37,13 @@ public:
   ~Message();
   Error decodeData(const uint8_t* data, size_t data_size);
   Error encodeData(uint8_t*& data, size_t& data_size);
-  ProtocolVersion getVersion();
-  const std::string getOrigin();
-  const std::string getRemote();
-  const uint8_t* getPayload(size_t& data_size);
-  const int getTTL();
-  const int getChecksum();
-  bool getOption(const Options option);
+  ProtocolVersion getVersion() const;
+  const std::string getOrigin() const;
+  const std::string getRemote() const;
+  const uint8_t* getPayload(size_t& data_size) const;
+  const int getTTL() const;
+  const int getChecksum() const;
+  bool getOption(const Options option) const;
 
 private:
   ProtocolVersion version;

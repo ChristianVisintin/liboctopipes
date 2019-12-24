@@ -56,7 +56,11 @@ public:
   Error setSubscribedCB(std::function<void(const Client*)> on_subscribed);
   Error setUnsubscribedCB(std::function<void(const Client*)> on_unsubscribed);
   //Getters
-  void* getUserData();
+  void* getUserData() const;
+  std::string getClientId() const;
+  std::string getCapPath() const;
+  std::string getPipeTx() const;
+  std::string getPipeRx() const;
   //Error
   static const std::string getErrorDesc(const Error error);
 

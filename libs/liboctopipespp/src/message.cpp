@@ -207,7 +207,7 @@ Error Message::encodeData(uint8_t*& data, size_t& data_size) {
  * @return ProtocolVersion
  */
 
-ProtocolVersion Message::getVersion() {
+ProtocolVersion Message::getVersion() const {
   return version;
 }
 
@@ -216,7 +216,7 @@ ProtocolVersion Message::getVersion() {
  * @return string
  */
 
-const std::string Message::getOrigin() {
+const std::string Message::getOrigin() const {
   return origin;
 }
 
@@ -225,7 +225,7 @@ const std::string Message::getOrigin() {
  * @return string
  */
 
-const std::string Message::getRemote() {
+const std::string Message::getRemote() const {
   return remote;
 }
 
@@ -235,7 +235,7 @@ const std::string Message::getRemote() {
  * @return uint8_t*
  */
 
-const uint8_t* Message::getPayload(size_t& data_size) {
+const uint8_t* Message::getPayload(size_t& data_size) const {
   data_size = this->payload_size;
   return payload;
 }
@@ -245,7 +245,7 @@ const uint8_t* Message::getPayload(size_t& data_size) {
  * @return int
  */
 
-const int Message::getTTL() {
+const int Message::getTTL() const {
   return ttl;
 }
 
@@ -254,7 +254,7 @@ const int Message::getTTL() {
  * @return int
  */
 
-const int Message::getChecksum() {
+const int Message::getChecksum() const {
   return checksum;
 }
 
@@ -264,7 +264,7 @@ const int Message::getChecksum() {
  * @return bool
  */
 
-bool Message::getOption(const Options option) {
+bool Message::getOption(const Options option) const {
   return (static_cast<uint8_t>(this->options) & static_cast<uint8_t>(option)) != 0;
 }
 
