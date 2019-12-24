@@ -33,6 +33,7 @@ class Message {
 public:
   Message();
   Message(const ProtocolVersion version, const std::string& origin, const std::string& remote, const uint8_t* payload, const size_t payload_size, const Options options, const int ttl);
+  Message(const void* octopipes_message);
   ~Message();
   Error decodeData(const uint8_t* data, size_t data_size);
   Error encodeData(uint8_t*& data, size_t& data_size);

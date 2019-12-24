@@ -54,6 +54,22 @@ Client::Client(const std::string& client_id, const std::string& cap_path, const 
   this->on_sent = nullptr;
   this->on_subscribed = nullptr;
   this->on_unsubscribed = nullptr;
+  this->user_data = nullptr;
+  //Set this in user_data
+  client->user_data = reinterpret_cast<void*>(this);
+}
+
+/**
+ * @brief Client constructor with user data
+ * @param string client id
+ * @param string cap path
+ * @param ProtocolVersion version
+ * @param void* user_data
+ * @throw std::bad_alloc
+ */
+
+Client::Client(const std::string& client_id, const std::string& cap_path, const ProtocolVersion version, void* user_data) : Client(client_id, cap_path, version) {
+  this->user_data = user_data;
 }
 
 /**
@@ -96,7 +112,7 @@ Error Client::stopLoop() {
 Error Client::subscribe(const std::list<std::string>& groups, CapError& assignment_error) {
   OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
   //Prepare groups
-  const char** groups_c = new char*[groups.size()];
+  const char** groups_c = new const char*[groups.size()];
   size_t i = 0;
   for (const auto& group : groups) {
     groups_c[i] = group.c_str();
@@ -152,54 +168,118 @@ Error Client::send(const std::string& remote, const void* data, const uint64_t d
 Error Client::sendEx(const std::string& remote, const void* data, const uint64_t data_size, const uint8_t ttl, const Options options) {
   OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
   //Send message
-  OctopipesError rc;
   return translate_octopipes_error(octopipes_send_ex(client, remote.c_str(), data, data_size, ttl, static_cast<OctopipesOptions>(options)));
 }
 
 //Callbacks
 
-Error Client::setReceivedCB(std::function<void(const Message*)> on_received) {
+Error Client::setReceivedCB(std::function<void(const Client*, const Message*)> on_received) {
   OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
   this->on_received = on_received;
-  //TODO: implement
-  //Pass a LAMBDA to the client
+  //Use a lambda expression to convert OctopipesMessage to message
+  client->on_received = [](const OctopipesClient* client, const OctopipesMessage* message) {
+    Client* client_ptr = reinterpret_cast<Client*>(client->user_data); //User data is always set here
+    if (client_ptr->on_received == nullptr) {
+      return; //Just return
+    }
+    //Convert OctopipesMessage to message
+    Message* msg = new Message(reinterpret_cast<const void*>(message));
+    client_ptr->on_received(client_ptr, msg);
+    delete msg;
+  };
   return Error::SUCCESS;
 }
 
+/**
+ * @brief set on_sent Callback
+ * @param function on_sent callback
+ * @return octopipes::Error
+ */
 
-
-Error Client::setSentCB(std::function<void(Message*)> on_sent) {
+Error Client::setSentCB(std::function<void(const Client*, const Message*)> on_sent) {
   OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
   this->on_sent = on_sent;
-  //TODO: implement
+  //Use a lambda expression to convert OctopipesMessage to message
+  client->on_sent = [](const OctopipesClient* client, const OctopipesMessage* message) {
+    Client* client_ptr = reinterpret_cast<Client*>(client->user_data); //User data is always set here
+    if (client_ptr->on_sent == nullptr) {
+      return; //Just return
+    }
+    //Convert OctopipesMessage to message
+    Message* msg = new Message(reinterpret_cast<const void*>(message));
+    client_ptr->on_sent(client_ptr, msg);
+    delete msg;
+  };
   return Error::SUCCESS;
 }
 
+/**
+ * @brief set on_error Callback
+ * @param function on_error callback
+ * @return octopipes::Error
+ */
 
-
-Error Client::setReceive_errorCB(std::function<void(const Error)> on_receive_error) {
+Error Client::setReceive_errorCB(std::function<void(const Client*, const Error)> on_receive_error) {
   OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
   this->on_receive_error = on_receive_error;
-  //TODO: implement
+  //Use a lambda expression
+  client->on_receive_error = [](const OctopipesClient* client, const OctopipesError error) {
+    Client* client_ptr = reinterpret_cast<Client*>(client->user_data); //User data is always set here
+    if (client_ptr->on_receive_error == nullptr) {
+      return; //Just return
+    }
+    client_ptr->on_receive_error(client_ptr, translate_octopipes_error(error));
+  };
   return Error::SUCCESS;
 }
 
+/**
+ * @brief set on_subscribed Callback
+ * @param function on_subscribed callback
+ * @return octopipes::Error
+ */
 
-
-Error Client::setSubscribedCB(std::function<void()> on_subscribed) {
+Error Client::setSubscribedCB(std::function<void(const Client*)> on_subscribed) {
   OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
   this->on_subscribed = on_subscribed;
-  //TODO: implement
+  //Use a lambda expression
+  client->on_subscribed = [](const OctopipesClient* client) {
+    Client* client_ptr = reinterpret_cast<Client*>(client->user_data); //User data is always set here
+    if (client_ptr->on_subscribed == nullptr) {
+      return; //Just return
+    }
+    client_ptr->on_subscribed(client_ptr);
+  };
   return Error::SUCCESS;
 }
 
+/**
+ * @brief set on_unsubscribed Callback
+ * @param function on_unsubscribed callback
+ * @return octopipes::Error
+ */
 
-
-Error Client::setUnsubscribedCB(std::function<void()> on_unsubscribed) {
+Error Client::setUnsubscribedCB(std::function<void(const Client*)> on_unsubscribed) {
   OctopipesClient* client = reinterpret_cast<OctopipesClient*>(octopipes_client);
   this->on_unsubscribed = on_unsubscribed;
-  //TODO: implement
+  //Use a lambda expression
+  client->on_unsubscribed = [](const OctopipesClient* client) {
+    Client* client_ptr = reinterpret_cast<Client*>(client->user_data); //User data is always set here
+    if (client_ptr->on_unsubscribed == nullptr) {
+      return; //Just return
+    }
+    client_ptr->on_unsubscribed(client_ptr);
+  };
   return Error::SUCCESS;
+}
+
+/**
+ * @brief returns user data (or nullptr)
+ * @return void*
+ */
+
+void* Client::getUserData() {
+  return user_data;
 }
 
 /**
@@ -256,6 +336,5 @@ CapError translate_cap_error(OctopipesCapError error) {
       return CapError::UNKNOWN;
   }
 }
-
 
 }

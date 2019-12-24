@@ -70,6 +70,31 @@ Message::Message(const ProtocolVersion version, const std::string& origin, const
 }
 
 /**
+ * @brief Construct a Message object using an OctopipesMessage pointer
+ * @param void* message pointer (OctopipesMessage*)
+ */
+
+Message::Message(const void* message_ptr) {
+  const OctopipesMessage* message = reinterpret_cast<const OctopipesMessage*>(message_ptr);
+  //Convert OctopipesMessage to Message
+  version = static_cast<ProtocolVersion>(message->version);
+  if (message->origin != NULL) {
+    origin = std::string(message->origin);
+  }
+  if (message->remote != NULL) {
+    remote = std::string(message->remote);
+  }
+  options = static_cast<Options>(message->options);
+  ttl = message->ttl;
+  payload = nullptr;
+  payload_size = message->data_size;
+  if (payload_size > 0) {
+    payload = new uint8_t[payload_size];
+    memcpy(payload, message->data, payload_size);
+  }
+}
+
+/**
  * @brief Message class destructor
  */
 
@@ -236,42 +261,6 @@ const int Message::getChecksum() {
 
 bool Message::getOption(const Options option) {
   return (static_cast<uint8_t>(this->options) & static_cast<uint8_t>(option)) != 0;
-}
-
-/**
- * @brief get Octopipes++ error from OctopipesError
- * @param OctopipesError
- * @return octopipes::Error
- */
-
-Error translate_octopipes_error(OctopipesError error) {
-  switch (error) {
-    case OCTOPIPES_ERROR_BAD_ALLOC:
-      return Error::BAD_ALLOC;
-    case OCTOPIPES_ERROR_BAD_CHECKSUM:
-      return Error::BAD_CHECKSUM;
-    case OCTOPIPES_ERROR_BAD_PACKET:
-      return Error::BAD_PACKET;
-    case OCTOPIPES_ERROR_CAP_TIMEOUT:
-      return Error::CAP_TIMEOUT;
-    case OCTOPIPES_ERROR_NO_DATA_AVAILABLE:
-      return Error::NO_DATA_AVAILABLE;
-    case OCTOPIPES_ERROR_NOT_SUBSCRIBED:
-      return Error::NOT_SUBSCRIBED;
-    case OCTOPIPES_ERROR_NOT_UNSUBSCRIBED:
-      return Error::NOT_UNSUBSCRIBED;
-    case OCTOPIPES_ERROR_OPEN_FAILED:
-      return Error::OPEN_FAILED;
-    case OCTOPIPES_ERROR_READ_FAILED:
-      return Error::READ_FAILED;
-    case OCTOPIPES_ERROR_THREAD:
-      return Error::THREAD;
-    case OCTOPIPES_ERROR_UNINITIALIZED:
-      return Error::UNINITIALIZED;
-    case OCTOPIPES_ERROR_UNKNOWN_ERROR:
-    default:
-      return Error::UNKNOWN_ERROR;
-  }
 }
 
 }

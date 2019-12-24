@@ -36,6 +36,7 @@ class Client {
 
 public:
   Client(const std::string& client_id, const std::string& cap_path, const ProtocolVersion version);
+  Client(const std::string& client_id, const std::string& cap_path, const ProtocolVersion version, void* user_data);
   ~Client();
   Error startLoop();
   Error stopLoop();
@@ -44,23 +45,26 @@ public:
   Error send(const std::string& remote, const void* data, const uint64_t data_size);
   Error sendEx(const std::string& remote, const void* data, const uint64_t data_size, const uint8_t ttl, const Options options);
   //Callbacks
-  Error setReceivedCB(std::function<void(const Message*)> on_received);
-  Error setSentCB(std::function<void(Message*)> on_sent);
-  Error setReceive_errorCB(std::function<void(const Error)> on_receive_error);
-  Error setSubscribedCB(std::function<void()> on_subscribed);
-  Error setUnsubscribedCB(std::function<void()> on_unsubscribed);
+  Error setReceivedCB(std::function<void(const Client*, const Message*)> on_received);
+  Error setSentCB(std::function<void(const Client*, const Message*)> on_sent);
+  Error setReceive_errorCB(std::function<void(const Client*, const Error)> on_receive_error);
+  Error setSubscribedCB(std::function<void(const Client*)> on_subscribed);
+  Error setUnsubscribedCB(std::function<void(const Client*)> on_unsubscribed);
+  //Getters
+  void* getUserData();
   //Error
   static const std::string getErrorDesc(const Error error);
 
 private:
   //Class attributes
   void* octopipes_client;
+  void* user_data;
   //Callbacks
-  std::function<void(const Message*)> on_received;
-  std::function<void(Message*)> on_sent;
-  std::function<void(const Error)> on_receive_error;
-  std::function<void()> on_subscribed;
-  std::function<void()> on_unsubscribed;
+  std::function<void(const Client*, const Message*)> on_received;
+  std::function<void(const Client*, const Message*)> on_sent;
+  std::function<void(const Client*, const Error)> on_receive_error;
+  std::function<void(const Client*)> on_subscribed;
+  std::function<void(const Client*)> on_unsubscribed;
 
 };
 
