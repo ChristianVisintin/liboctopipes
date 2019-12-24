@@ -64,7 +64,7 @@ int message_counter = 0;
  * @param OctopipesMessage*
  */
 
-void on_received(const OctopipesMessage* message) {
+void on_received(const OctopipesClient* client, const OctopipesMessage* message) {
   message_counter++;
   if (message_counter >= count && count != -1) {
     return;
@@ -87,7 +87,7 @@ void on_received(const OctopipesMessage* message) {
  * @param OctopipesError
  */
 
-void on_error(const OctopipesError error) {
+void on_error(const OctopipesClient* client, const OctopipesError error) {
   printf("ERROR: %s\n", octopipes_get_error_desc(error));
 }
 

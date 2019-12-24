@@ -236,7 +236,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
     client->state = OCTOPIPES_STATE_SUBSCRIBED;
     //Call on unsubscribed callback
     if (client->on_subscribed != NULL) {
-      client->on_subscribed();
+      client->on_subscribed(client);
     }
   }
   //Free input data, and return rc
@@ -301,7 +301,7 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   }
   //Call on unsubscribed callback
   if (client->on_unsubscribed != NULL) {
-    client->on_unsubscribed();
+    client->on_unsubscribed(client);
   }
   //Set state to unsubscribed
   if (rc == OCTOPIPES_ERROR_SUCCESS) {
@@ -386,7 +386,7 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
   rc = pipe_send(client->tx_pipe, out_data, out_data_size, ttl * 1000);
   //Call on sent callback if necessary
   if (rc == OCTOPIPES_ERROR_SUCCESS && client->on_sent != NULL) {
-    client->on_sent(message);
+    client->on_sent(client, message);
   }
   //Call on sent
   octopipes_cleanup_message(message);
@@ -401,7 +401,7 @@ OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, co
  * @return OctopipesError
  */
 
-OctopipesError octopipes_set_received_cb(OctopipesClient* client, void (*on_received)(const OctopipesMessage*)) {
+OctopipesError octopipes_set_received_cb(OctopipesClient* client, void (*on_received)(const OctopipesClient* client, const OctopipesMessage*)) {
   if (client == NULL) {
     return OCTOPIPES_ERROR_UNINITIALIZED;
   }
@@ -416,7 +416,7 @@ OctopipesError octopipes_set_received_cb(OctopipesClient* client, void (*on_rece
  * @return OctopipesError
  */
 
-OctopipesError octopipes_set_sent_cb(OctopipesClient* client, void (*on_sent)(const OctopipesMessage*)) {
+OctopipesError octopipes_set_sent_cb(OctopipesClient* client, void (*on_sent)(const OctopipesClient* client, const OctopipesMessage*)) {
   if (client == NULL) {
     return OCTOPIPES_ERROR_UNINITIALIZED;
   }
@@ -431,7 +431,7 @@ OctopipesError octopipes_set_sent_cb(OctopipesClient* client, void (*on_sent)(co
  * @return OctopipesError
  */
 
-OctopipesError octopipes_set_receive_error_cb(OctopipesClient* client, void (*on_receive_error)(const OctopipesError)) {
+OctopipesError octopipes_set_receive_error_cb(OctopipesClient* client, void (*on_receive_error)(const OctopipesClient* client, const OctopipesError)) {
   if (client == NULL) {
     return OCTOPIPES_ERROR_UNINITIALIZED;
   }
@@ -446,7 +446,7 @@ OctopipesError octopipes_set_receive_error_cb(OctopipesClient* client, void (*on
  * @return OctopipesError
  */
 
-OctopipesError octopipes_set_subscribed_cb(OctopipesClient* client, void (*on_subscribed)()) {
+OctopipesError octopipes_set_subscribed_cb(OctopipesClient* client, void (*on_subscribed)(const OctopipesClient* client)) {
   if (client == NULL) {
     return OCTOPIPES_ERROR_UNINITIALIZED;
   }
@@ -461,7 +461,7 @@ OctopipesError octopipes_set_subscribed_cb(OctopipesClient* client, void (*on_su
  * @return OctopipesError
  */
 
-OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_unsubscribed)()) {
+OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_unsubscribed)(const OctopipesClient* client)) {
   if (client == NULL) {
     return OCTOPIPES_ERROR_UNINITIALIZED;
   }
@@ -532,7 +532,7 @@ void* octopipes_loop(void* args) {
       if ((rc = octopipes_decode(data_in, data_in_size, &message)) == OCTOPIPES_ERROR_SUCCESS) {
         //Decoding was successful, report received message
         if (client->on_received != NULL) {
-          client->on_received(message); //@! Success
+          client->on_received(client, message); //@! Success
         }
         //If RCK, send ACK
         if ((message->options & OCTOPIPES_OPTIONS_REQUIRE_ACK) != 0) {
@@ -543,7 +543,7 @@ void* octopipes_loop(void* args) {
       } else {
         //@! Report error
         if (client->on_receive_error != NULL) {
-          client->on_receive_error(rc);
+          client->on_receive_error(client, rc);
         }
       }
       //Free data
@@ -553,7 +553,7 @@ void* octopipes_loop(void* args) {
     } else {
       //@! Report error
       if (client->on_receive_error != NULL) {
-        client->on_receive_error(rc);
+        client->on_receive_error(client, rc);
       }
     }
     //Nothing else to do

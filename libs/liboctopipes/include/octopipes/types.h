@@ -96,11 +96,11 @@ typedef struct OctopipesClient {
   char* tx_pipe;
   char* rx_pipe;
   //Callbacks
-  void (*on_received)(const OctopipesMessage*);
-  void (*on_sent)(const OctopipesMessage*);
-  void (*on_receive_error)(const OctopipesError);
-  void (*on_subscribed)();
-  void (*on_unsubscribed)();
+  void (*on_received)(const struct OctopipesClient* client, const OctopipesMessage*);
+  void (*on_sent)(const struct OctopipesClient* client, const OctopipesMessage*);
+  void (*on_receive_error)(const struct OctopipesClient* client, const OctopipesError);
+  void (*on_subscribed)(const struct OctopipesClient* client);
+  void (*on_unsubscribed)(const struct OctopipesClient* client);
 } OctopipesClient;
 
 typedef enum OctopipesCapMessage {

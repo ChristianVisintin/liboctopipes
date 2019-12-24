@@ -50,11 +50,11 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client);
 OctopipesError octopipes_send(OctopipesClient* client, const char* remote, const void* data, uint64_t data_size);
 OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, const void* data, uint64_t data_size, const uint8_t ttl, const OctopipesOptions options);
 //Callbacks
-OctopipesError octopipes_set_received_cb(OctopipesClient* client, void (*on_received)(const OctopipesMessage*));
-OctopipesError octopipes_set_sent_cb(OctopipesClient* client, void (*on_sent)(const OctopipesMessage*));
-OctopipesError octopipes_set_receive_error_cb(OctopipesClient* client, void (*on_receive_error)(const OctopipesError));
-OctopipesError octopipes_set_subscribed_cb(OctopipesClient* client, void (*on_subscribed)());
-OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_unsubscribed)());
+OctopipesError octopipes_set_received_cb(OctopipesClient* client, void (*on_received)(const OctopipesClient* client, const OctopipesMessage*));
+OctopipesError octopipes_set_sent_cb(OctopipesClient* client, void (*on_sent)(const OctopipesClient* client, const OctopipesMessage*));
+OctopipesError octopipes_set_receive_error_cb(OctopipesClient* client, void (*on_receive_error)(const OctopipesClient* client, const OctopipesError));
+OctopipesError octopipes_set_subscribed_cb(OctopipesClient* client, void (*on_subscribed)(const OctopipesClient* client));
+OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_unsubscribed)(const OctopipesClient* client));
 //Errors
 const char* octopipes_get_error_desc(const OctopipesError error);
 
