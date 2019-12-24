@@ -143,6 +143,8 @@ void on_receive_error(const OctopipesClient* client, const OctopipesError error)
   printf("%son_receive_error: Client %s ERROR: %s%s\n", KRED, client->client_id, octopipes_get_error_desc(error), KNRM);
 }
 
+#ifndef _WIN32
+
 /**
  * @brief main for second child (Fake client which sends a message)
  * @return int
@@ -184,6 +186,8 @@ int main_fake_client() {
   printf("%sFreed fake client; returning 0%s\n", KMAG, KNRM);
   return 0;
 }
+
+#endif
 
 /**
  * @brief main for parent process (parent is client)
@@ -239,6 +243,7 @@ int main_client() {
         break;
       }
       case RUNNING: {
+#ifndef _WIN32
         printf("%sPreparing an IPC simulation%s\n", KYEL, KNRM);
         //Fork itself and simulate a messange exchange
         pid_t child_pid;
@@ -256,6 +261,7 @@ int main_client() {
         if (messages_received == 0) {
           printf("%sNEVER RECEIVED A SINGLE MESSAGE!!!%s\n", KRED, KNRM);
         }
+#endif
         current_step = UNSUBSCRIBE;
         break;
       }
