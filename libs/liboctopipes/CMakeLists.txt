@@ -28,6 +28,9 @@ file(GLOB PIPES_TEST_SRC
 file(GLOB PARSER_TEST_SRC
   "${ROOT_TESTS_DIR}/parser/*.c"
 )
+file(GLOB CLIENT_TEST_SRC
+  "${ROOT_TESTS_DIR}/client/*.c"
+)
 
 set(CXX_FLAGS "-g -Wall")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall")
@@ -54,11 +57,15 @@ add_executable(test_pipes ${PIPES_TEST_SRC})
 target_link_libraries(test_pipes octopipes_shared -lpthread)
 add_executable(test_parser ${PARSER_TEST_SRC})
 target_link_libraries(test_parser octopipes_shared -lpthread)
+add_executable(test_client ${CLIENT_TEST_SRC})
+target_link_libraries(test_client octopipes_shared -lpthread)
 if(CMAKE_COMPILER_IS_GNUCXX)
   target_compile_options(test_pipes PUBLIC "--coverage")
   target_compile_options(test_parser PUBLIC "--coverage")
+  target_compile_options(test_client PUBLIC "--coverage")
   target_link_libraries(test_parser gcov)
   target_link_libraries(test_pipes gcov)
+  target_link_libraries(test_client gcov)
 endif()
 #Install rules
 install(TARGETS octopipes_shared CONFIGURATIONS Release LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)
