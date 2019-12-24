@@ -231,14 +231,21 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
   }
-  //Verify packet type
-  OctopipesCapMessage message_type = octopipes_cap_get_message(in_data, in_data_size);
-  if (message_type != OCTOPIPES_CAP_ASSIGNMENT) { //Return bad packet, the user must redo the operation
+  OctopipesMessage* cap_message;
+  rc = octopipes_decode(in_data, in_data_size, &cap_message);
+  if (rc != OCTOPIPES_ERROR_SUCCESS) {
     free(in_data);
+    return rc;
+  }
+  free(in_data);
+  //Verify packet type
+  OctopipesCapMessage message_type = octopipes_cap_get_message(cap_message->data, cap_message->data_size);
+  if (message_type != OCTOPIPES_CAP_ASSIGNMENT) { //Return bad packet, the user must redo the operation
+    octopipes_cleanup_message(cap_message);
     return OCTOPIPES_ERROR_BAD_PACKET;
   }
   //Parse assignment
-  rc = octopipes_cap_parse_assign(in_data, in_data_size, assignment_error, &client->tx_pipe, &client->rx_pipe);
+  rc = octopipes_cap_parse_assign(cap_message->data, cap_message->data_size, assignment_error, &client->tx_pipe, &client->rx_pipe);
   if (rc == OCTOPIPES_ERROR_SUCCESS) {
     //Enter subscribed state
     client->state = OCTOPIPES_STATE_SUBSCRIBED;
@@ -248,7 +255,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
     }
   }
   //Free input data, and return rc
-  free(in_data);
+  octopipes_cleanup_message(cap_message);
   return rc;
 }
 
