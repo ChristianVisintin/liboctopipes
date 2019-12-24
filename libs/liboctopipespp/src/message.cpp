@@ -21,7 +21,7 @@
  * SOFTWARE.
 **/
 
-#include <octopipes/message.hpp>
+#include <octopipespp/message.hpp>
 #include <octopipes/octopipes.h>
 #include <octopipes/serializer.h>
 

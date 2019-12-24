@@ -21,7 +21,7 @@
  * SOFTWARE.
 **/
 
-#include <octopipes/octopipespp.hpp>
+#include <octopipespp/octopipespp.hpp>
 
 #include <octopipes/octopipes.h>
 

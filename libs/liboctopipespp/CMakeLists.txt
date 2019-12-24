@@ -14,7 +14,7 @@ include_directories(
 )
 #Includes
 file(GLOB INCLUDE_FILES
-  "${CMAKE_CURRENT_SOURCE_DIR}/include/octopipes/*.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/octopipespp/*.hpp"
 )
 
 #Library
@@ -58,4 +58,4 @@ target_link_libraries(octopipespp_static -lpthread octopipes_static)
 #Install rules
 install(TARGETS octopipespp_shared CONFIGURATIONS Release LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)
 install(TARGETS octopipespp_static CONFIGURATIONS Release ARCHIVE DESTINATION lib)
-INSTALL(FILES ${INCLUDE_FILES} DESTINATION include/octopipes/)
+INSTALL(FILES ${INCLUDE_FILES} DESTINATION include/octopipespp/)
