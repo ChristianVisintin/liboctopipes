@@ -71,6 +71,7 @@ OctopipesError octopipes_init(OctopipesClient** client, const char* client_id, c
   (*client)->on_receive_error = NULL;
   (*client)->on_subscribed = NULL;
   (*client)->on_unsubscribed = NULL;
+  (*client)->extra = NULL;
   return OCTOPIPES_ERROR_SUCCESS;
 }
 
