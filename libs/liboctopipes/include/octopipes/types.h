@@ -102,7 +102,7 @@ typedef struct OctopipesClient {
   void (*on_subscribed)(const struct OctopipesClient* client);
   void (*on_unsubscribed)(const struct OctopipesClient* client);
   //Extra - can be used to store anything NOTE: must be freed by the user
-  void* extra;
+  void* user_data;
 } OctopipesClient;
 
 typedef enum OctopipesCapMessage {
