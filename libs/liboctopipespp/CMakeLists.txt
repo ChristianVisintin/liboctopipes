@@ -26,6 +26,9 @@ file(GLOB LIBOCTOPIPESPP_SRC
 file(GLOB PARSER_TEST_SRC
   "${ROOT_TESTS_DIR}/parser/*.cpp"
 )
+file(GLOB CLIENT_TEST_SRC
+  "${ROOT_TESTS_DIR}/client/*.cpp"
+)
 
 set(CXX_FLAGS "-g -Wall")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -g")
@@ -44,9 +47,13 @@ target_link_libraries(octopipespp_static -lpthread octopipes_static)
 #Build tests
 add_executable(test_parserpp ${PARSER_TEST_SRC})
 target_link_libraries(test_parserpp octopipespp_shared)
+add_executable(test_clientpp ${CLIENT_TEST_SRC})
+target_link_libraries(test_clientpp octopipespp_shared)
 if(CMAKE_COMPILER_IS_GNUCXX)
   target_compile_options(test_parserpp PUBLIC "--coverage")
   target_link_libraries(test_parserpp gcov)
+  target_compile_options(test_clientpp PUBLIC "--coverage")
+  target_link_libraries(test_clientpp gcov)
 endif()
 #Install rules
 install(TARGETS octopipespp_shared CONFIGURATIONS Release LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)

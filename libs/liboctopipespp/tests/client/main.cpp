@@ -21,20 +21,22 @@
  * SOFTWARE.
 **/
 
+#include <octopipespp/octopipespp.hpp>
+
 #include <octopipes/octopipes.h>
 #include <octopipes/cap.h>
 #include <octopipes/pipes.h>
 #include <octopipes/serializer.h>
 
+#include <cstring>
 #include <getopt.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <iostream>
+#include <string>
+
 #include <sys/time.h>
 #include <unistd.h>
 
-#define PROGRAM_NAME "test_client"
+#define PROGRAM_NAME "test_clientpp"
 #define USAGE PROGRAM_NAME "Usage: " PROGRAM_NAME " [Options]\n\
 \t -t <txPipePath>\tSpecify RX Pipe for this instance\n\
 \t -r <rxPipePath>\tSpecify RX Pipe for this instance\n\
@@ -59,13 +61,13 @@
 #define KCYN "\x1B[36m"
 #define KWHT "\x1B[37m"
 
-char* txPipe = NULL;
-char* rxPipe = NULL;
-char* capPipe = NULL;
+std::string txPipe;
+std::string rxPipe;
+std::string capPipe;
 int messages_received = 0;
 
 /**
- * Test Description: test_client simulates the connection steps with the server (subscription, assignment, ipc, unsubscription), the test consists in:
+ * Test Description: test_clientpp simulates the connection steps with the server (subscription, assignment, ipc, unsubscription), the test consists in:
  * - crating new pipes
  * - read from pipe
  * - write to pipe
@@ -75,31 +77,17 @@ int messages_received = 0;
  * - stop looping
  * - unsubscribe from the server
  * Functions covered by this test (including CAP and pipes):
- * - octopipes_init
- * - octopipes_cleanup
- * - octopipes_cleanup_message
- * - octopipes_loop_start
- * - octopipes_loop_stop
- * - octopipes_subscribe
- * - octopipes_unsubscribe
- * - octopipes_send
- * - octopipes_send_ex
- * - octopipes_set_received_cb
- * - octopipes_set_sent_cb
- * - octopipes_set_receive_error_cb
- * - octopipes_set_subscribed_cb
- * - octopipes_set_unsubscribed_cb
- * - octopipes_get_error_desc
+ * - octopipes::Client* class
  * NOTE: This test forks itself to create a dummy client (so it doesn't run on Windows...)
  */
 
-typedef enum ClientStep {
+enum class ClientStep {
   INITIALIZED,
   SUBSCRIBED,
   RUNNING,
   UNSUBSCRIBE,
   TERMINATED
-} ClientStep;
+};
 
 /**
  * @brief generate a random string of alphanumerical characters
@@ -121,26 +109,28 @@ static char* gen_rand_string(char* str, size_t size) {
   return str;
 }
 
-void on_subscribed(const OctopipesClient* client) {
-  printf("%son_subscribed: Client %s SUBSCRIBED to the server%s\n", KYEL, client->client_id, KNRM);
+void on_subscribed(const octopipes::Client* client) {
+  printf("%son_subscribed: Client %s SUBSCRIBED to the server%s\n", KYEL, client->getClientId().c_str(), KNRM);
 }
 
-void on_unsubscribed(const OctopipesClient* client) {
-  printf("%son_unsubscribed: Client %s UNSUBSCRIBED to the server%s\n", KYEL, client->client_id, KNRM);
+void on_unsubscribed(const octopipes::Client* client) {
+  printf("%son_unsubscribed: Client %s UNSUBSCRIBED to the server%s\n", KYEL, client->getClientId().c_str(), KNRM);
 }
 
 void on_sent(const OctopipesClient* client, const OctopipesMessage* message) {
   printf("%son_sent: Client %s SENT message with size %llu bytes%s\n", KMAG, client->client_id, message->data_size, KNRM);
 }
 
-void on_received(const OctopipesClient* client, const OctopipesMessage* message) {
-  printf("%son_received: Client %s RECEIVED message from %s with data %.*s%s\n", KYEL, client->client_id, message->origin, (int) message->data_size, message->data, KNRM);
+void on_received(const octopipes::Client* client, const octopipes::Message* message) {
+  size_t data_size;
+  const uint8_t* data = message->getPayload(data_size);
+  printf("%son_received: Client %s RECEIVED message from %s with data %.*s%s\n", KYEL, client->getClientId().c_str(), message->getOrigin().c_str(), (int) data_size, data, KNRM);
   //Use extra data to count messages
   messages_received++;
 }
 
-void on_receive_error(const OctopipesClient* client, const OctopipesError error) {
-  printf("%son_receive_error: Client %s ERROR: %s%s\n", KRED, client->client_id, octopipes_get_error_desc(error), KNRM);
+void on_receive_error(const octopipes::Client* client, const octopipes::Error error) {
+  printf("%son_receive_error: Client %s ERROR: %s%s\n", KRED, client->getClientId().c_str(), octopipes::Client::getErrorDesc(error).c_str(), KNRM);
 }
 
 #ifndef _WIN32
@@ -155,14 +145,14 @@ int main_fake_client() {
   OctopipesClient* fake_client;
   OctopipesError ret;
   printf("%sInitializing FAKE client%s\n", KMAG, KNRM);
-  if ((ret = octopipes_init(&fake_client, FAKE_CLIENT_NAME, capPipe, OCTOPIPES_VERSION_1)) != OCTOPIPES_ERROR_SUCCESS) {
+  if ((ret = octopipes_init(&fake_client, FAKE_CLIENT_NAME, capPipe.c_str(), OCTOPIPES_VERSION_1)) != OCTOPIPES_ERROR_SUCCESS) {
     printf("%sCould not initialize octopipes client: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
     return 1;
   }
   printf("%sFAKE client initialized; Forcing subscription state%s\n", KMAG, KNRM);
   //Set manually the params for the fake client (the pipes between client and fake clients will be shared)
-  fake_client->tx_pipe = rxPipe;
-  fake_client->rx_pipe = txPipe;
+  fake_client->tx_pipe = const_cast<char*>(rxPipe.c_str());
+  fake_client->rx_pipe = const_cast<char*>(txPipe.c_str());
   //Force state to SUBSCRIBED ;)
   fake_client->state = OCTOPIPES_STATE_SUBSCRIBED;
   fake_client->on_sent = on_sent;
@@ -200,49 +190,47 @@ int main_client() {
   printf("%sPARENT (client): Starting main in 3 seconds%s\n", KYEL, KNRM);
   sleep(3);
   unsigned long int total_time_elapsed = 0;
-  ClientStep current_step = INITIALIZED;
-  OctopipesClient* client;
-  OctopipesError ret;
+  ClientStep current_step = ClientStep::INITIALIZED;
   //Initialize client
-  if ((ret = octopipes_init(&client, CLIENT_NAME, capPipe, OCTOPIPES_VERSION_1)) != OCTOPIPES_ERROR_SUCCESS) {
-    printf("%sCould not initialize octopipes client: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
-    return 1;
-  }
+  octopipes::Client* client = new octopipes::Client(CLIENT_NAME, capPipe, octopipes::ProtocolVersion::VERSION_1);
+  octopipes::Error ret;
   //Set callbacks
-  octopipes_set_receive_error_cb(client, on_receive_error);
-  octopipes_set_received_cb(client, on_received);
-  octopipes_set_sent_cb(client, on_sent);
-  octopipes_set_subscribed_cb(client, on_subscribed);
-  octopipes_set_unsubscribed_cb(client, on_unsubscribed);
+  client->setReceive_errorCB(on_receive_error);
+  client->setReceivedCB(on_received);
+  client->setSubscribedCB(on_subscribed);
+  client->setUnsubscribedCB(on_unsubscribed);
   printf("%sOctopipes client initialized%s\n", KYEL, KNRM);
-  while (current_step != TERMINATED) {
+  struct timeval t_start, t_subscribed, t_recv, t_end;
+  gettimeofday(&t_start, NULL);
+  while (current_step != ClientStep::TERMINATED) {
     switch(current_step) {
-      case INITIALIZED: {
+      case ClientStep::INITIALIZED: {
         //Send subscribe
-        OctopipesCapError cap_error;
+        octopipes::CapError cap_error;
         printf("%sPreparing SUBSCRIBE request%s\n", KYEL, KNRM);
-        if ((ret = octopipes_subscribe(client, NULL, 0, &cap_error)) != OCTOPIPES_ERROR_SUCCESS) {
-          printf("%sCould not subscribe octopipes client: %s (CAP error: %d)%s\n", KRED, octopipes_get_error_desc(ret), cap_error, KNRM);
-          current_step = TERMINATED;
+        if ((ret = client->subscribe(std::list<std::string>(), cap_error)) != octopipes::Error::SUCCESS) {
+          printf("%sCould not subscribe octopipes client: %s (CAP error: %d)%s\n", KRED, octopipes::Client::getErrorDesc(ret).c_str(), static_cast<int>(cap_error), KNRM);
+          current_step = ClientStep::TERMINATED;
           continue;
         }
-        printf("%sSuccessfully SUBSCRIBED to the server! (TX: %s; RX: %s)%s\n", KYEL, client->tx_pipe, client->rx_pipe, KNRM);
-        current_step = SUBSCRIBED;
+        printf("%sSuccessfully SUBSCRIBED to the server! (TX: %s; RX: %s)%s\n", KYEL, client->getPipeTx().c_str(), client->getPipeRx().c_str(), KNRM);
+        current_step = ClientStep::SUBSCRIBED;
+        gettimeofday(&t_subscribed, NULL);
         //Start loop
         break;
       }
-      case SUBSCRIBED: {
+      case ClientStep::SUBSCRIBED: {
         //Start loop
-        if ((ret = octopipes_loop_start(client)) != OCTOPIPES_ERROR_SUCCESS) {
-          printf("%sCould not start octopipes client loop: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
-          current_step = TERMINATED;
+        if ((ret = client->startLoop()) != octopipes::Error::SUCCESS) {
+          printf("%sCould not start octopipes client loop: %s (%d)%s\n", KRED, octopipes::Client::getErrorDesc(ret).c_str(), ret, KNRM);
+          current_step = ClientStep::TERMINATED;
           continue;
         }
         printf("%sLoop started%s\n", KYEL, KNRM);
-        current_step = RUNNING;
+        current_step = ClientStep::RUNNING;
         break;
       }
-      case RUNNING: {
+      case ClientStep::RUNNING: {
 #ifndef _WIN32
         printf("%sPreparing an IPC simulation%s\n", KYEL, KNRM);
         //Fork itself and simulate a messange exchange
@@ -261,34 +249,38 @@ int main_client() {
         if (messages_received == 0) {
           printf("%sNEVER RECEIVED A SINGLE MESSAGE!!!%s\n", KRED, KNRM);
         }
+        gettimeofday(&t_recv, NULL);
 #endif
-        current_step = UNSUBSCRIBE;
+        current_step = ClientStep::UNSUBSCRIBE;
         break;
       }
-      case UNSUBSCRIBE: {
+      case ClientStep::UNSUBSCRIBE: {
         printf("%sPreparing UNSUBSCRIBE request%s\n", KYEL, KNRM);
         //Unsubscribe
-        if ((ret = octopipes_unsubscribe(client)) != OCTOPIPES_ERROR_SUCCESS) {
-          printf("%sCould not unsubscribe octopipes client: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
+        if ((ret = client->unsubscribe()) != octopipes::Error::SUCCESS) {
+          printf("%sCould not unsubscribe octopipes client: %s%s\n", KRED, octopipes::Client::getErrorDesc(ret).c_str(), KNRM);
           continue;
         }
         printf("%sSuccessfully UNSUBSCRIBED from the server!%s\n", KYEL, KNRM);
-        current_step = TERMINATED;
+        current_step = ClientStep::TERMINATED;
+        gettimeofday(&t_end, NULL);
         break;
       }
       
-      case TERMINATED: {
+      case ClientStep::TERMINATED: {
         break;
       }
     }
   }
   printf("%sTest terminated; about to cleanup Octopipes Client%s\n", KYEL, KNRM);
   //Cleanup client
-  if ((ret = octopipes_cleanup(client)) != OCTOPIPES_ERROR_SUCCESS) {
-    printf("%sCould not cleanup octopipes client: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
-    return 1;
-  }
+  delete client;
   printf("%sOctopipesClient cleaned up%s\n", KYEL, KNRM);
+  const time_t subscription_time = t_subscribed.tv_usec - t_start.tv_usec;
+  const time_t recv_time = t_recv.tv_usec - t_subscribed.tv_usec;
+  const time_t unsubscription_time = t_end.tv_usec - t_recv.tv_usec;
+  total_time_elapsed = t_end.tv_usec - t_start.tv_usec;
+  std::cout << KYEL << "(Microseconds) Total time elapsed: " << total_time_elapsed << "; subscription time: " << subscription_time << "; receive time: " << recv_time << "; unsubscription time: " << unsubscription_time << KNRM << std::endl;
   sleep(2); //Give to the server the time to terminate
   return 0;
 }
@@ -313,7 +305,7 @@ int main_server() {
     OctopipesError ret;
     struct timeval t_start, t_read, t_write, t_end;
     gettimeofday(&t_start, NULL);
-    ret = pipe_receive(capPipe, &data_in, &data_in_size, 5000);
+    ret = pipe_receive(capPipe.c_str(), &data_in, &data_in_size, 5000);
     gettimeofday(&t_read, NULL);
     const time_t read_time = t_read.tv_usec - t_start.tv_usec;
     total_time_elapsed += read_time;
@@ -358,7 +350,7 @@ int main_server() {
           //Prepare assign
           uint8_t* out_payload;
           size_t out_payload_size;
-          out_payload = octopipes_cap_prepare_assign(OCTOPIPES_CAP_ERROR_SUCCESS, txPipe, strlen(txPipe), rxPipe, strlen(rxPipe), &out_payload_size);
+          out_payload = octopipes_cap_prepare_assign(OCTOPIPES_CAP_ERROR_SUCCESS, txPipe.c_str(), txPipe.length(), rxPipe.c_str(), rxPipe.length(), &out_payload_size);
           printf("%sPrepared ASSIGNMENT payload%s\n", KCYN, KNRM);
           //Send data
           OctopipesMessage* assignment_message = (OctopipesMessage*) malloc(sizeof(OctopipesMessage));
@@ -368,10 +360,13 @@ int main_server() {
             octopipes_cleanup_message(message);
             return 1;
           }
+          char* remote = new char[CLIENT_NAME_SIZE + 1];
+          memcpy(remote, CLIENT_NAME, CLIENT_NAME_SIZE);
+          remote[CLIENT_NAME_SIZE] = 0x00;
           assignment_message->version = OCTOPIPES_VERSION_1;
           assignment_message->origin = NULL;
           assignment_message->origin_size = 0; //Server
-          assignment_message->remote = CLIENT_NAME;
+          assignment_message->remote = remote;
           assignment_message->remote_size = CLIENT_NAME_SIZE;
           assignment_message->ttl = 60;
           assignment_message->data_size = out_payload_size;
@@ -384,8 +379,10 @@ int main_server() {
           printf("%sEncoding ASSIGNMENT message%s\n", KCYN, KNRM);
           if ((ret = octopipes_encode(assignment_message, &out_data, &out_data_size)) != OCTOPIPES_ERROR_SUCCESS) {
             printf("%sCould not encode assignment message: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
+            delete[] remote;
             free(assignment_message);
           }
+          delete[] remote;
           free(assignment_message);
           free(out_payload);
           //Send assignment
@@ -395,7 +392,7 @@ int main_server() {
             printf("%02x ", out_data[i]);
           }
           printf("%s\n", KNRM);
-          if ((ret = pipe_send(capPipe, out_data, out_data_size, 5000)) != OCTOPIPES_ERROR_SUCCESS) {
+          if ((ret = pipe_send(capPipe.c_str(), out_data, out_data_size, 5000)) != OCTOPIPES_ERROR_SUCCESS) {
             printf("%sCould not send assignment to client: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
             free(out_data);
             octopipes_cleanup_message(message);
@@ -470,28 +467,28 @@ int main(int argc, char** argv) {
   }
 
   //Check if tx pipe and rx pipe are set
-  if (txPipe == NULL || rxPipe == NULL || capPipe == NULL) {
-    printf("Missing TX Pipe (%p) or RX Pipe (%p) or CAP Pipe (%p)\n%s\n", txPipe, rxPipe, capPipe, USAGE);
+  if (txPipe.empty() || rxPipe.empty() || capPipe.empty()) {
+    printf("Missing TX Pipe (%d) or RX Pipe (%d) or CAP Pipe (%d)\n%s\n", txPipe.empty(), rxPipe.empty(), capPipe.empty(), USAGE);
     return 1;
   }
 
   //Create pipes
   OctopipesError rc;
-  if ((rc = pipe_create(txPipe)) != OCTOPIPES_ERROR_SUCCESS) {
-    printf("Could not create TX pipe (%s): %s\n", txPipe, octopipes_get_error_desc(rc));
+  if ((rc = pipe_create(txPipe.c_str())) != OCTOPIPES_ERROR_SUCCESS) {
+    printf("Could not create TX pipe (%s): %s\n", txPipe.c_str(), octopipes_get_error_desc(rc));
     return 1;
   }
-  if ((rc = pipe_create(rxPipe)) != OCTOPIPES_ERROR_SUCCESS) {
-    printf("Could not create RX pipe (%s): %s\n", rxPipe, octopipes_get_error_desc(rc));
+  if ((rc = pipe_create(rxPipe.c_str())) != OCTOPIPES_ERROR_SUCCESS) {
+    printf("Could not create RX pipe (%s): %s\n", rxPipe.c_str(), octopipes_get_error_desc(rc));
     //Remote tx pipe
-    pipe_delete(txPipe);
+    pipe_delete(txPipe.c_str());
     return 1;
   }
-  if ((rc = pipe_create(capPipe)) != OCTOPIPES_ERROR_SUCCESS) {
-    printf("Could not create CAP pipe (%s): %s\n", capPipe, octopipes_get_error_desc(rc));
+  if ((rc = pipe_create(capPipe.c_str())) != OCTOPIPES_ERROR_SUCCESS) {
+    printf("Could not create CAP pipe (%s): %s\n", capPipe.c_str(), octopipes_get_error_desc(rc));
     //Remote tx pipe
-    pipe_delete(txPipe);
-    pipe_delete(rxPipe);
+    pipe_delete(txPipe.c_str());
+    pipe_delete(rxPipe.c_str());
     return 1;
   }
 
@@ -512,14 +509,14 @@ int main(int argc, char** argv) {
     ret = main_client();
     //Remove pipes
     printf("Removing TX and RX pipes\n");
-    if ((rc = pipe_delete(txPipe)) != OCTOPIPES_ERROR_SUCCESS) {
-      printf("Could not delete TX pipe (%s): %s\n", txPipe, octopipes_get_error_desc(rc));
+    if ((rc = pipe_delete(txPipe.c_str())) != OCTOPIPES_ERROR_SUCCESS) {
+      printf("Could not delete TX pipe (%s): %s\n", txPipe.c_str(), octopipes_get_error_desc(rc));
     }
-    if ((rc = pipe_delete(rxPipe)) != OCTOPIPES_ERROR_SUCCESS) {
-      printf("Could not delete RX pipe (%s): %s\n", rxPipe, octopipes_get_error_desc(rc));
+    if ((rc = pipe_delete(rxPipe.c_str())) != OCTOPIPES_ERROR_SUCCESS) {
+      printf("Could not delete RX pipe (%s): %s\n", rxPipe.c_str(), octopipes_get_error_desc(rc));
     }
-    if ((rc = pipe_delete(capPipe)) != OCTOPIPES_ERROR_SUCCESS) {
-      printf("Could not delete CAP pipe (%s): %s\n", rxPipe, octopipes_get_error_desc(rc));
+    if ((rc = pipe_delete(capPipe.c_str())) != OCTOPIPES_ERROR_SUCCESS) {
+      printf("Could not delete CAP pipe (%s): %s\n", rxPipe.c_str(), octopipes_get_error_desc(rc));
     }
     printf("Parent (client) process exited with code %d\n", ret);
   } else {

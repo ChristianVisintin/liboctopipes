@@ -335,6 +335,8 @@ Error translate_octopipes_error(OctopipesError error) {
       return Error::OPEN_FAILED;
     case OCTOPIPES_ERROR_READ_FAILED:
       return Error::READ_FAILED;
+    case OCTOPIPES_ERROR_SUCCESS:
+      return Error::SUCCESS;
     case OCTOPIPES_ERROR_THREAD:
       return Error::THREAD;
     case OCTOPIPES_ERROR_UNINITIALIZED:
