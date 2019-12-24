@@ -269,7 +269,7 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   if (client == NULL) {
     return OCTOPIPES_ERROR_UNINITIALIZED;
   }
-  if (client->state != OCTOPIPES_STATE_SUBSCRIBED) {
+  if (client->state != OCTOPIPES_STATE_SUBSCRIBED && client->state != OCTOPIPES_STATE_RUNNING) {
     return OCTOPIPES_ERROR_NOT_SUBSCRIBED;
   }
   OctopipesError rc;
@@ -357,7 +357,7 @@ OctopipesError octopipes_send(OctopipesClient* client, const char* remote, const
  */
 
 OctopipesError octopipes_send_ex(OctopipesClient* client, const char* remote, const void* data, uint64_t data_size, const uint8_t ttl, const OctopipesOptions options) {
-  if (client != NULL) {
+  if (client == NULL) {
     return OCTOPIPES_ERROR_UNINITIALIZED;
   }
   //Check if state is running or subscribed
