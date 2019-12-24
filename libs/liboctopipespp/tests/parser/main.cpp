@@ -23,6 +23,7 @@
 
 #include <octopipespp/octopipespp.hpp>
 #include <getopt.h>
+#include <cstring>
 
 #define PROGRAM_NAME "test_parser"
 #define USAGE PROGRAM_NAME "Usage: " PROGRAM_NAME " [Options]\n\
