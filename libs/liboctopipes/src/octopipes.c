@@ -162,7 +162,7 @@ OctopipesError octopipes_loop_stop(OctopipesClient* client) {
   //Join thread
   client->state = OCTOPIPES_STATE_STOPPED;
   if (pthread_join(client->loop, NULL) != 0) {
-    client->state = OCTOPIPES_STATE_UNSUBSCRIBED;
+    client->state = OCTOPIPES_STATE_SUBSCRIBED; //Set state back to SUBSCRIBED
   }
   return OCTOPIPES_ERROR_SUCCESS;
 }
@@ -321,6 +321,8 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
   }
+  //Stop loop
+  octopipes_loop_stop(client);
   //Call on unsubscribed callback
   if (client->on_unsubscribed != NULL) {
     client->on_unsubscribed(client);
