@@ -244,6 +244,14 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
     octopipes_cleanup_message(cap_message);
     return OCTOPIPES_ERROR_BAD_PACKET;
   }
+  //Stop running thread and free previous pipe
+  if (client->state == OCTOPIPES_STATE_RUNNING) {
+    octopipes_loop_stop(client);
+  }
+  if (client->state == OCTOPIPES_STATE_SUBSCRIBED || client->state == OCTOPIPES_STATE_RUNNING) {
+    free(client->tx_pipe);
+    free(client->rx_pipe);
+  }
   //Parse assignment
   rc = octopipes_cap_parse_assign(cap_message->data, cap_message->data_size, assignment_error, &client->tx_pipe, &client->rx_pipe);
   if (rc == OCTOPIPES_ERROR_SUCCESS) {

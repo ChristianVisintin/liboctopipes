@@ -285,6 +285,7 @@ uint8_t calculate_checksum(const OctopipesMessage* message) {
     checksum = checksum ^ ((message->data_size >> 8) & 0xFF);
     checksum = checksum ^ (message->data_size & 0xFF);
     checksum = checksum ^ message->options;
+    checksum = checksum ^ STX;
     for (size_t i = 0; i < message->data_size; i++) {
       checksum = checksum ^ message->data[i];
     }
