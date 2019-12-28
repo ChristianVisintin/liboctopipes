@@ -33,7 +33,7 @@
  * @return uint8_t* data out
  */
 
-uint8_t* octopipes_cap_prepare_subscribe(const char** groups, const size_t groups_size, size_t* data_size) {
+uint8_t* octopipes_cap_prepare_subscription(const char** groups, const size_t groups_size, size_t* data_size) {
   size_t current_size = 2; //Size is at least 2 (descriptor, groups amount)
   //Iterate over groups to get total size
   for (size_t i = 0; i < groups_size; i++) {
@@ -44,7 +44,7 @@ uint8_t* octopipes_cap_prepare_subscribe(const char** groups, const size_t group
   if (data == NULL) {
     return NULL;
   }
-  data[0] = (uint8_t) OCTOPIPES_CAP_SUBSCRIBE;
+  data[0] = (uint8_t) OCTOPIPES_CAP_SUBSCRIBPTION;
   data[1] = (uint8_t) groups_size;
   size_t data_ptr = 2;
   for (size_t i = 0; i < groups_size; i++) {
@@ -93,13 +93,13 @@ uint8_t* octopipes_cap_prepare_assign(OctopipesCapError error, const char* fifo_
  * @return out data
  */
 
-uint8_t* octopipes_cap_prepare_unsubscribe(size_t* data_size) {
+uint8_t* octopipes_cap_prepare_unsubscription(size_t* data_size) {
   *data_size = 1;
   uint8_t* data = (uint8_t*) malloc(sizeof(uint8_t) * *data_size);
   if (data == NULL) {
     return NULL;
   }
-  data[0] = OCTOPIPES_CAP_UNSUBSCRIBE;
+  data[0] = OCTOPIPES_CAP_UNSUBSCRIBPTION;
   return data;
 }
 
@@ -116,10 +116,10 @@ OctopipesCapMessage octopipes_cap_get_message(const uint8_t* data, const size_t 
   }
   const uint8_t object = data[0];
   switch (object) {
-    case OCTOPIPES_CAP_SUBSCRIBE:
-      return OCTOPIPES_CAP_SUBSCRIBE;
-    case OCTOPIPES_CAP_UNSUBSCRIBE:
-      return OCTOPIPES_CAP_UNSUBSCRIBE;
+    case OCTOPIPES_CAP_SUBSCRIBPTION:
+      return OCTOPIPES_CAP_SUBSCRIBPTION;
+    case OCTOPIPES_CAP_UNSUBSCRIBPTION:
+      return OCTOPIPES_CAP_UNSUBSCRIBPTION;
     case OCTOPIPES_CAP_ASSIGNMENT:
       return OCTOPIPES_CAP_ASSIGNMENT;
     default:
@@ -140,7 +140,7 @@ OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t d
   if (data_size < 2) {
     return OCTOPIPES_ERROR_BAD_PACKET;
   }
-  if (data[0] != OCTOPIPES_CAP_SUBSCRIBE) {
+  if (data[0] != OCTOPIPES_CAP_SUBSCRIBPTION) {
     return OCTOPIPES_ERROR_BAD_PACKET;
   }
   *groups_amount = (size_t) data[1];
@@ -242,7 +242,7 @@ OctopipesError octopipes_cap_parse_unsubscribe(const uint8_t* data, const size_t
   if (data_size == 0) {
     return OCTOPIPES_ERROR_BAD_PACKET;
   }
-  if (data[0] == OCTOPIPES_CAP_UNSUBSCRIBE) {
+  if (data[0] == OCTOPIPES_CAP_UNSUBSCRIBPTION) {
     return OCTOPIPES_ERROR_SUCCESS;
   } else {
     return OCTOPIPES_ERROR_BAD_PACKET;

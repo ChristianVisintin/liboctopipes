@@ -62,9 +62,9 @@
  * - octopipes_decode
  * - octopipes_encode
  * - calculate_checksum
- * - octopipes_cap_prepare_subscribe
+ * - octopipes_cap_prepare_subscription
  * - octopipes_cap_prepare_assign
- * - octopipes_cap_prepare_unsubscribe
+ * - octopipes_cap_prepare_unsubscription
  * - octopipes_cap_get_message
  * - octopipes_cap_parse_subscribe
  * - octopipes_cap_parse_assign
@@ -313,7 +313,7 @@ int test_cap_subscribe() {
   groups[2] = (char*) group_drivers;
   //Encode subscribe
   size_t data_size;
-  uint8_t* subscribe_data = octopipes_cap_prepare_subscribe((const char**) groups, 3, &data_size);
+  uint8_t* subscribe_data = octopipes_cap_prepare_subscription((const char**) groups, 3, &data_size);
   if (subscribe_data == NULL) {
     printf("%sCould not prepare subscribe; data is invalid%s\n", KRED, KNRM);
   }
@@ -325,7 +325,7 @@ int test_cap_subscribe() {
   printf("%s\n", KNRM);
   //Check if it is a subscribe data
   OctopipesCapMessage message_type = octopipes_cap_get_message(subscribe_data, data_size);
-  if (message_type != OCTOPIPES_CAP_SUBSCRIBE) {
+  if (message_type != OCTOPIPES_CAP_SUBSCRIBPTION) {
     printf("%sMessage encoded is not subscribed type (%d)%s\n", KRED, message_type, KNRM);
     free(subscribe_data);
     return OCTOPIPES_ERROR_BAD_PACKET;
@@ -465,7 +465,7 @@ int test_cap_unsubscribe() {
   //Encode assignment
   size_t data_size;
   OctopipesCapError error = OCTOPIPES_CAP_ERROR_SUCCESS;
-  uint8_t* unsubscribe_data = octopipes_cap_prepare_unsubscribe(&data_size);
+  uint8_t* unsubscribe_data = octopipes_cap_prepare_unsubscription(&data_size);
   if (unsubscribe_data == NULL) {
     printf("%sCould not prepare unsubscribe; data is invalid%s\n", KRED, KNRM);
   }
@@ -477,7 +477,7 @@ int test_cap_unsubscribe() {
   printf("%s\n", KNRM);
   //Check if it is a assignment data
   OctopipesCapMessage message_type = octopipes_cap_get_message(unsubscribe_data, data_size);
-  if (message_type != OCTOPIPES_CAP_UNSUBSCRIBE) {
+  if (message_type != OCTOPIPES_CAP_UNSUBSCRIBPTION) {
     printf("%sMessage encoded is not of unsubscribe type (%d)%s\n", KRED, message_type, KNRM);
     free(unsubscribe_data);
     return OCTOPIPES_ERROR_BAD_PACKET;

@@ -205,7 +205,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   subscribe_message->ttl = DEFAULT_TTL;
   subscribe_message->options = OCTOPIPES_OPTIONS_NONE;
   //Data
-  subscribe_message->data = octopipes_cap_prepare_subscribe(groups, groups_amount, (size_t*) &subscribe_message->data_size);
+  subscribe_message->data = octopipes_cap_prepare_subscription(groups, groups_amount, (size_t*) &subscribe_message->data_size);
   if (subscribe_message->data == NULL) {
     octopipes_cleanup_message(subscribe_message);
     return OCTOPIPES_ERROR_BAD_ALLOC;
@@ -310,7 +310,7 @@ OctopipesError octopipes_unsubscribe(OctopipesClient* client) {
   subscribe_message->ttl = DEFAULT_TTL;
   subscribe_message->options = OCTOPIPES_OPTIONS_NONE;
   //Data
-  subscribe_message->data = octopipes_cap_prepare_unsubscribe((size_t*) &subscribe_message->data_size);
+  subscribe_message->data = octopipes_cap_prepare_unsubscription((size_t*) &subscribe_message->data_size);
   if (subscribe_message->data == NULL) {
     octopipes_cleanup_message(subscribe_message);
     return OCTOPIPES_ERROR_BAD_ALLOC;

@@ -49,9 +49,9 @@ enum class Error {
 
 enum class CapMessage {
   UNKNOWN = 0x00,
-  SUBSCRIBE = 0x01,
+  SUBSCRIBPTION = 0x01,
   ASSIGNMENT = 0xFF,
-  UNSUBSCRIBE = 0x02
+  UNSUBSCRIBPTION = 0x02
 };
 
 enum class CapError {

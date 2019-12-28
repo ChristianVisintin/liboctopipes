@@ -55,9 +55,9 @@
  * - octopipes_decode
  * - octopipes_encode
  * - calculate_checksum
- * - octopipes_cap_prepare_subscribe
+ * - octopipes_cap_prepare_subscription
  * - octopipes_cap_prepare_assign
- * - octopipes_cap_prepare_unsubscribe
+ * - octopipes_cap_prepare_unsubscription
  * - octopipes_cap_get_message
  * - octopipes_cap_parse_subscribe
  * - octopipes_cap_parse_assign

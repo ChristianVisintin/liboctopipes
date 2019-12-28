@@ -107,9 +107,9 @@ typedef struct OctopipesClient {
 
 typedef enum OctopipesCapMessage {
   OCTOPIPES_CAP_UNKNOWN = 0x00,
-  OCTOPIPES_CAP_SUBSCRIBE = 0x01,
+  OCTOPIPES_CAP_SUBSCRIBPTION = 0x01,
   OCTOPIPES_CAP_ASSIGNMENT = 0xFF,
-  OCTOPIPES_CAP_UNSUBSCRIBE = 0x02
+  OCTOPIPES_CAP_UNSUBSCRIBPTION = 0x02
 } OctopipesCapMessage;
 
 typedef enum OctopipesCapError {

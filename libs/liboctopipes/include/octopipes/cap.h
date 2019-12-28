@@ -31,9 +31,9 @@ extern "C" {
 #include "types.h"
 
 //Prepare
-uint8_t* octopipes_cap_prepare_subscribe(const char** groups, const size_t groups_size, size_t* data_size);
+uint8_t* octopipes_cap_prepare_subscription(const char** groups, const size_t groups_size, size_t* data_size);
 uint8_t* octopipes_cap_prepare_assign(OctopipesCapError error, const char* fifo_tx, const size_t fifo_tx_size, const char* fifo_rx, const size_t fifo_rx_size, size_t* data_size);
-uint8_t* octopipes_cap_prepare_unsubscribe(size_t* data_size);
+uint8_t* octopipes_cap_prepare_unsubscription(size_t* data_size);
 //Parse
 OctopipesCapMessage octopipes_cap_get_message(const uint8_t* data, const size_t data_size);
 OctopipesError octopipes_cap_parse_subscribe(const uint8_t* data, const size_t data_size, char*** groups, size_t* groups_amount);
