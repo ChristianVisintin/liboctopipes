@@ -79,7 +79,6 @@ OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size,
   //Poll FIFO
   while (time_elapsed < timeout) {
     ret = poll(fds, 1, 50);
-    time_elapsed += 100;
     if (ret > 0) {
       // Fifo is available to be read
       if (fds[0].revents & POLLIN) {
@@ -111,6 +110,7 @@ OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size,
     } else if (ret == 0) {
       //Break if no data is available
       if (*data == NULL) {
+        time_elapsed += 100; //Sum time only if no data was received (in order to prevent data cut)
         continue; //Keep waiting for data
       } else {
         break; //Exit
