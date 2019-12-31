@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
       return 1;
     }
   }
-  //Get subscribptions
+  //Get subscriptions
   for (size_t i; optind < argc; optind++) {
     groups[i++] = argv[optind]; //Won't be freed since not allocated dynamically
   }

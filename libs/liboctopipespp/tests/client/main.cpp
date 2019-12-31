@@ -329,7 +329,7 @@ int main_server() {
       OctopipesCapMessage message_type = octopipes_cap_get_message(message->data, message->data_size);
       //Switch on message type
       switch (message_type) {
-        case OCTOPIPES_CAP_SUBSCRIBPTION: { //@!SUBSCRIBE
+        case OCTOPIPES_CAP_SUBSCRIPTION: { //@!SUBSCRIBE
           printf("%sReceived SUBSCRIBE request from %s%s\n", KCYN, message->origin, KNRM);
           //Parse subscribe
           char** groups = NULL;
@@ -407,7 +407,7 @@ int main_server() {
           free(out_data);
           break;
         }
-        case OCTOPIPES_CAP_UNSUBSCRIBPTION: {
+        case OCTOPIPES_CAP_UNSUBSCRIPTION: {
           printf("%sReceived UNSUBSCRIBE request from %s%s\n", KCYN, message->origin, KNRM);
           if ((ret = octopipes_cap_parse_unsubscribe(message->data, message->data_size)) != OCTOPIPES_ERROR_SUCCESS) {
             printf("%sCould not parse unsubscribe message%s\n", KRED, KNRM);

@@ -325,7 +325,7 @@ int test_cap_subscribe() {
   printf("%s\n", KNRM);
   //Check if it is a subscribe data
   OctopipesCapMessage message_type = octopipes_cap_get_message(subscribe_data, data_size);
-  if (message_type != OCTOPIPES_CAP_SUBSCRIBPTION) {
+  if (message_type != OCTOPIPES_CAP_SUBSCRIPTION) {
     printf("%sMessage encoded is not subscribed type (%d)%s\n", KRED, message_type, KNRM);
     free(subscribe_data);
     return OCTOPIPES_ERROR_BAD_PACKET;
@@ -477,7 +477,7 @@ int test_cap_unsubscribe() {
   printf("%s\n", KNRM);
   //Check if it is a assignment data
   OctopipesCapMessage message_type = octopipes_cap_get_message(unsubscribe_data, data_size);
-  if (message_type != OCTOPIPES_CAP_UNSUBSCRIBPTION) {
+  if (message_type != OCTOPIPES_CAP_UNSUBSCRIPTION) {
     printf("%sMessage encoded is not of unsubscribe type (%d)%s\n", KRED, message_type, KNRM);
     free(unsubscribe_data);
     return OCTOPIPES_ERROR_BAD_PACKET;
