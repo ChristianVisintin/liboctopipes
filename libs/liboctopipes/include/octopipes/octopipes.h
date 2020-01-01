@@ -35,7 +35,7 @@ extern "C" {
 #define OCTOPIPES_LIB_VERSION_MAJOR 0
 #define OCTOPIPES_LIB_VERSION_MINOR 1
 
-//Client
+//@! Client
 
 //Functions
 //Alloc operations
@@ -58,11 +58,35 @@ OctopipesError octopipes_set_receive_error_cb(OctopipesClient* client, void (*on
 OctopipesError octopipes_set_subscribed_cb(OctopipesClient* client, void (*on_subscribed)(const OctopipesClient* client));
 OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_unsubscribed)(const OctopipesClient* client));
 
-//Server
+//@! Server
 
+//Alloc
+OctopipesServerError octopipes_server_init(OctopipesServer** server, const char* cap_path, const char* client_folder, const OctopipesVersion version);
+OctopipesServerError octopipes_server_cleanup(OctopipesServer* server);
+//CAP
+OctopipesServerError octopipes_server_start_cap_listener(OctopipesServer* server);
+OctopipesServerError octopipes_server_stop_cap_listener(OctopipesServer* server);
+OctopipesServerError octopipes_server_lock_cap(OctopipesServer* server);
+OctopipesServerError octopipes_server_unlock_cap(OctopipesServer* server);
+OctopipesServerError octopipes_server_write_cap(OctopipesServer* server, const char* client, const uint8_t* data, const size_t data_size);
+OctopipesServerError octopipes_server_process_cap_once(OctopipesServer* server, size_t* requests);
+OctopipesServerError octopipes_server_process_cap_all(OctopipesServer* server, size_t* requests);
+OctopipesServerError octopipes_server_handle_cap_message(OctopipesServer* server, const OctopipesMessage* message);
+//Workers
+OctopipesServerError octopipes_server_start_worker(OctopipesServer* server, const char* client, const char** subscriptions, const size_t subscription_len, const char* cli_tx_pipe, const char* cli_rx_pipe);
+OctopipesServerError octopipes_server_stop_worker(OctopipesServer* server, const char* client);
+OctopipesServerError octopipes_server_dispatch_message(OctopipesServer* server, const OctopipesMessage* message);
+OctopipesServerError octopipes_server_process_first(OctopipesServer* server, size_t* requests, char** client);
+OctopipesServerError octopipes_server_process_once(OctopipesServer* server, size_t* requests, char** client);
+OctopipesServerError octopipes_server_process_all(OctopipesServer* server, size_t* requests, char** client);
+//Getters
+OctopipesServerError octopipes_server_is_subscribed(OctopipesServer* server, const char* client);
+OctopipesServerError octopipes_server_get_subscriptions(OctopipesServer* server, const char* client, char*** subscriptions);
+OctopipesServerError octopipes_server_get_clients(OctopipesServer* server, char*** clients);
 
 //Errors
 const char* octopipes_get_error_desc(const OctopipesError error);
+const char* octopipes_server_get_error_desc(const OctopipesServerError error);
 
 #ifdef __cplusplus
 }
