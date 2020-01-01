@@ -35,6 +35,8 @@ extern "C" {
 #define OCTOPIPES_LIB_VERSION_MAJOR 0
 #define OCTOPIPES_LIB_VERSION_MINOR 1
 
+//Client
+
 //Functions
 //Alloc operations
 OctopipesError octopipes_init(OctopipesClient** client, const char* client_id, const char* cap_path, const OctopipesVersion version_to_use);
@@ -55,6 +57,10 @@ OctopipesError octopipes_set_sent_cb(OctopipesClient* client, void (*on_sent)(co
 OctopipesError octopipes_set_receive_error_cb(OctopipesClient* client, void (*on_receive_error)(const OctopipesClient* client, const OctopipesError));
 OctopipesError octopipes_set_subscribed_cb(OctopipesClient* client, void (*on_subscribed)(const OctopipesClient* client));
 OctopipesError octopipes_set_unsubscribed_cb(OctopipesClient* client, void (*on_unsubscribed)(const OctopipesClient* client));
+
+//Server
+
+
 //Errors
 const char* octopipes_get_error_desc(const OctopipesError error);
 

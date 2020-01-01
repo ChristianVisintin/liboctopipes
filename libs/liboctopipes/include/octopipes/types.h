@@ -58,6 +58,13 @@ typedef enum OctopipesState {
   OCTOPIPES_STATE_STOPPED
 } OctopipesState;
 
+typedef enum OctopipesServerState {
+  OCTOPIPES_SERVER_STATE_INIT,
+  OCTOPIPES_SERVER_STATE_RUNNING,
+  OCTOPIPES_SERVER_STATE_BLOCK,
+  OCTOPIPES_SERVER_STATE_STOPPED
+} OctopipesServerState;
+
 typedef enum OctopipesOptions {
   OCTOPIPES_OPTIONS_NONE = 0,
   OCTOPIPES_OPTIONS_REQUIRE_ACK = 1,
@@ -68,6 +75,19 @@ typedef enum OctopipesOptions {
 typedef enum OctopipesVersion {
   OCTOPIPES_VERSION_1 = 1
 } OctopipesVersion;
+
+typedef enum OctopipesCapMessage {
+  OCTOPIPES_CAP_UNKNOWN = 0x00,
+  OCTOPIPES_CAP_SUBSCRIPTION = 0x01,
+  OCTOPIPES_CAP_ASSIGNMENT = 0xFF,
+  OCTOPIPES_CAP_UNSUBSCRIPTION = 0x02
+} OctopipesCapMessage;
+
+typedef enum OctopipesCapError {
+  OCTOPIPES_CAP_ERROR_SUCCESS = 0,
+  OCTOPIPES_CAP_ERROR_NAME_ALREADY_TAKEN = 1,
+  OCTOPIPES_CAP_ERROR_FS = 2
+} OctopipesCapError;
 
 typedef struct OctopipesMessage {
   OctopipesVersion version;
@@ -105,18 +125,65 @@ typedef struct OctopipesClient {
   void* user_data;
 } OctopipesClient;
 
-typedef enum OctopipesCapMessage {
-  OCTOPIPES_CAP_UNKNOWN = 0x00,
-  OCTOPIPES_CAP_SUBSCRIPTION = 0x01,
-  OCTOPIPES_CAP_ASSIGNMENT = 0xFF,
-  OCTOPIPES_CAP_UNSUBSCRIPTION = 0x02
-} OctopipesCapMessage;
+//@! Server
 
-typedef enum OctopipesCapError {
-  OCTOPIPES_CAP_ERROR_SUCCESS = 0,
-  OCTOPIPES_CAP_ERROR_NAME_ALREADY_TAKEN = 1,
-  OCTOPIPES_CAP_ERROR_FS = 2
-} OctopipesCapError;
+typedef enum OctopipesServerError {
+  OCTOPIPES_SERVER_ERROR_SUCCESS,
+  OCTOPIPES_SERVER_ERROR_UNINITIALIZED,
+  OCTOPIPES_SERVER_ERROR_BAD_PACKET,
+  OCTOPIPES_SERVER_ERROR_BAD_CHECKSUM,
+  OCTOPIPES_SERVER_ERROR_UNSUPPORTED_VERSION,
+  OCTOPIPES_SERVER_ERROR_OPEN_FAILED,
+  OCTOPIPES_SERVER_ERROR_WRITE_FAILED,
+  OCTOPIPES_SERVER_ERROR_READ_FAILED,
+  OCTOPIPES_SERVER_ERROR_CAP_TIMEOUT,
+  OCTOPIPES_SERVER_ERROR_THREAD_ERROR,
+  OCTOPIPES_SERVER_ERROR_THREAD_ALREADY_RUNNING,
+  OCTOPIPES_SERVER_ERROR_WORKER_EXISTS,
+  OCTOPIPES_SERVER_ERROR_WORKER_NOT_FOUND,
+  OCTOPIPES_SERVER_ERROR_WORKER_ALREADY_RUNNING,
+  OCTOPIPES_SERVER_ERROR_WORKER_NOT_RUNNING,
+  OCTOPIPES_SERVER_ERROR_NO_RECIPIENT,
+  OCTOPIPES_SERVER_ERROR_BAD_CLIENT_DIR
+} OctopipesServerError;
+
+typedef struct OctopipesServerMessage {
+  OctopipesMessage* message;
+  OctopipesServerError error;
+} OctopipesServerMessage;
+
+typedef struct OctopipesServerInbox {
+  OctopipesServerMessage** messages;
+  size_t inbox_len;
+} OctopipesServerInbox;
+
+typedef struct OctopipesServerWorker {
+  char* client_id;
+  char** subscriptions_list;
+  size_t subscriptions;
+  //Pipes
+  char* pipe_read;
+  char* pipe_write;
+  //Thread stuff
+  pthread_t worker_listener;
+  int active;
+  OctopipesServerInbox* inbox;
+} OctopipesServerWorker;
+
+typedef struct OctopipesServer {
+  //Version
+  OctopipesVersion version;
+  OctopipesServerState state;
+  //Pipe
+  char* cap_pipe;
+  char* client_folder;
+  //Thread
+  pthread_t cap_listener;
+  OctopipesServerInbox* cap_inbox;
+  //Workers
+  OctopipesServerWorker** workers;
+  size_t workers_len;
+} OctopipesServer;
 
 #ifdef __cplusplus
 }
