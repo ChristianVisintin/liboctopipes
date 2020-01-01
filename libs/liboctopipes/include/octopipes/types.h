@@ -168,6 +168,7 @@ typedef struct OctopipesServerWorker {
   char* pipe_write;
   //Thread stuff
   pthread_t worker_listener;
+  pthread_mutex_t worker_lock;
   int active;
   OctopipesServerInbox* inbox;
 } OctopipesServerWorker;
@@ -180,6 +181,7 @@ typedef struct OctopipesServer {
   char* cap_pipe;
   char* client_folder;
   //Thread
+  pthread_mutex_t cap_lock;
   pthread_t cap_listener;
   OctopipesServerInbox* cap_inbox;
   //Workers
