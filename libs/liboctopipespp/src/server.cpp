@@ -25,6 +25,8 @@
 
 #include <octopipes/octopipes.h>
 
+#include <cstring>
+
 namespace octopipes {
 
 //Local functions
