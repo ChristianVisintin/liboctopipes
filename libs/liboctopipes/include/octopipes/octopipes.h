@@ -66,16 +66,11 @@ OctopipesServerError octopipes_server_cleanup(OctopipesServer* server);
 //CAP
 OctopipesServerError octopipes_server_start_cap_listener(OctopipesServer* server);
 OctopipesServerError octopipes_server_stop_cap_listener(OctopipesServer* server);
-OctopipesServerError octopipes_server_lock_cap(OctopipesServer* server);
-OctopipesServerError octopipes_server_unlock_cap(OctopipesServer* server);
-OctopipesServerError octopipes_server_write_cap(OctopipesServer* server, const char* client, const uint8_t* data, const size_t data_size);
 OctopipesServerError octopipes_server_process_cap_once(OctopipesServer* server, size_t* requests);
 OctopipesServerError octopipes_server_process_cap_all(OctopipesServer* server, size_t* requests);
-OctopipesServerError octopipes_server_handle_cap_message(OctopipesServer* server, OctopipesMessage* message);
 //Workers
 OctopipesServerError octopipes_server_start_worker(OctopipesServer* server, const char* client, char** subscriptions, const size_t subscription_len, const char* cli_tx_pipe, const char* cli_rx_pipe);
 OctopipesServerError octopipes_server_stop_worker(OctopipesServer* server, const char* client);
-OctopipesServerError octopipes_server_dispatch_message(OctopipesServer* server, OctopipesMessage* message, const char** worker);
 OctopipesServerError octopipes_server_process_first(OctopipesServer* server, size_t* requests, const char** client);
 OctopipesServerError octopipes_server_process_once(OctopipesServer* server, size_t* requests, const char** client);
 OctopipesServerError octopipes_server_process_all(OctopipesServer* server, size_t* requests, const char** client);

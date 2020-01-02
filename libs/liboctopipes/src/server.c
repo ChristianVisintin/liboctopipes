@@ -35,9 +35,14 @@
 
 //@! Privates
 //CAP
+OctopipesServerError octopipes_server_lock_cap(OctopipesServer* server);
+OctopipesServerError octopipes_server_unlock_cap(OctopipesServer* server);
+OctopipesServerError octopipes_server_write_cap(OctopipesServer* server, const char* client, const uint8_t* data, const size_t data_size);
+OctopipesServerError octopipes_server_handle_cap_message(OctopipesServer* server, OctopipesMessage* message);
 OctopipesServerError cap_manage_subscription(OctopipesServer* server, const char* client, const uint8_t* payload, const size_t payload_len);
 OctopipesServerError cap_manage_unsubscription(OctopipesServer* server, const char* client, const uint8_t* payload, const size_t payload_len);
 //Workers
+OctopipesServerError octopipes_server_dispatch_message(OctopipesServer* server, OctopipesMessage* message, const char** worker);
 OctopipesServerError worker_init(OctopipesServerWorker** worker, const char** subcsriptions, const size_t sub_len, const char* client_id, const char* pipe_read, const char* pipe_write);
 OctopipesServerError worker_cleanup(OctopipesServerWorker* worker);
 OctopipesServerError worker_send(OctopipesServerWorker* worker, OctopipesMessage* message);
