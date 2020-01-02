@@ -27,16 +27,20 @@
 #include <octopipes/serializer.h>
 
 #include <dirent.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 //@! Privates
+//CAP
+OctopipesServerError cap_manage_subscription(OctopipesServer* server, const char* client, const uint8_t* payload, const size_t payload_len);
+OctopipesServerError cap_manage_unsubscription(OctopipesServer* server, const char* client, const uint8_t* payload, const size_t payload_len);
 //Workers
 OctopipesServerError worker_init(OctopipesServerWorker** worker, const char** subcsriptions, const size_t sub_len, const char* client_id, const char* pipe_read, const char* pipe_write);
 OctopipesServerError worker_cleanup(OctopipesServerWorker* worker);
-OctopipesServerError worker_send(OctopipesServerWorker* worker, const OctopipesMessage* message);
+OctopipesServerError worker_send(OctopipesServerWorker* worker, OctopipesMessage* message);
 OctopipesServerError worker_get_next_message(OctopipesServerWorker* worker, OctopipesServerMessage** message);
 OctopipesServerError worker_get_subscriptions(OctopipesServerWorker* worker, char*** groups, size_t* groups_len);
 int worker_match_subscription(OctopipesServerWorker* worker, const char* remote);
@@ -47,6 +51,8 @@ OctopipesServerMessage* message_inbox_dequeue(OctopipesServerInbox* inbox);
 OctopipesServerError message_inbox_expunge(OctopipesServerInbox* inbox);
 OctopipesServerError message_inbox_push(OctopipesServerInbox* inbox, OctopipesMessage* message, OctopipesServerError error);
 OctopipesServerError message_inbox_remove(OctopipesServerInbox* inbox, const size_t index);
+//Messages
+OctopipesServerError server_message_cleanup(OctopipesServerMessage* message);
 //Thread
 void* cap_loop(void* args);
 void* worker_loop(void* args);
@@ -320,13 +326,11 @@ OctopipesServerError octopipes_server_process_cap_once(OctopipesServer* server, 
     } else {
       //Process message
       if ((rc = octopipes_server_handle_cap_message(server, message->message)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
-        octopipes_cleanup_message(message->message);
-        free(message);
+        server_message_cleanup(message);
         return rc;
       }
-      octopipes_cleanup_message(message->message);
     }
-    free(message);
+    server_message_cleanup(message);
     *requests = *requests + 1;
   }
   //Unlock mutex
@@ -367,8 +371,134 @@ OctopipesServerError octopipes_server_process_cap_all(OctopipesServer* server, s
  * @return OctopipesServerError
  */
 
-OctopipesServerError octopipes_server_handle_cap_message(OctopipesServer* server, const OctopipesMessage* message) {
-  //TODO: handle
+OctopipesServerError octopipes_server_handle_cap_message(OctopipesServer* server, OctopipesMessage* message) {
+  //Get CAP message type
+  if (message->data == NULL) {
+    return OCTOPIPES_SERVER_ERROR_BAD_PACKET;
+  }
+  if (message->origin == NULL) {
+    return OCTOPIPES_SERVER_ERROR_BAD_PACKET;
+  }
+  OctopipesCapMessage message_type = octopipes_cap_get_message(message->data, message->data_size);
+  switch (message_type) {
+    case OCTOPIPES_CAP_SUBSCRIPTION: {
+      return cap_manage_subscription(server, message->origin, message->data, message->data_size);
+    }
+    case OCTOPIPES_CAP_UNSUBSCRIPTION: {
+      return cap_manage_unsubscription(server, message->origin, message->data, message->data_size);
+    }
+    default:
+      return OCTOPIPES_SERVER_ERROR_BAD_PACKET;
+  }
+}
+
+/**
+ * @brief manage a subscription from a client message
+ * @param OctopipesServer* server
+ * @param char* client
+ * @param uint8_t* message payload
+ * @param size_t payload lenght
+ * @return OctopipesServerError
+ */
+
+OctopipesServerError cap_manage_subscription(OctopipesServer* server, const char* client, const uint8_t* payload, const size_t payload_len) {
+  //Parse subscription
+  OctopipesError ret;
+  char** groups = NULL;
+  size_t groups_len;
+  if ((ret = octopipes_cap_parse_subscribe(payload, payload_len, &groups, &groups_len)) != OCTOPIPES_ERROR_SUCCESS) {
+    return to_server_error(ret);
+  }
+  //Prepare pipes
+  size_t pipe_tx_len = strlen(server->client_folder) + 1 + strlen(client) + 9;
+  char* pipe_tx = (char*) malloc(sizeof(char) * pipe_tx_len);
+  if (pipe_tx == NULL) {
+    return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+  }
+  sprintf(pipe_tx, "%s/%s_tx.fifo", server->client_folder, client);
+  size_t pipe_rx_len = strlen(server->client_folder) + 1 + strlen(client) + 9;
+  char* pipe_rx = (char*) malloc(sizeof(char) * pipe_rx_len);
+  if (pipe_rx == NULL) {
+    free(pipe_tx);
+    return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+  }
+  sprintf(pipe_rx, "%s/%s_rx.fifo", server->client_folder, client);
+  //Create worker
+  OctopipesServerError rc;
+  OctopipesCapError cap_err = OCTOPIPES_CAP_ERROR_SUCCESS;
+  if ((rc = octopipes_server_start_worker(server, client, groups, groups_len, pipe_tx, pipe_rx)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+    free(pipe_rx);
+    free(pipe_tx);
+    for (size_t i = 0; i < groups_len; i++) {
+      free(groups[i]);
+    }
+    free(groups);
+    cap_err = OCTOPIPES_CAP_ERROR_FS;
+  }
+  //Free groups
+  for (size_t i = 0; i < groups_len; i++) {
+    free(groups[i]);
+  }
+  free(groups);
+  //Check if worker already exists
+  if (octopipes_server_is_subscribed(server, client) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+    cap_err = OCTOPIPES_CAP_ERROR_NAME_ALREADY_TAKEN;
+  }
+  if (cap_err != OCTOPIPES_CAP_ERROR_SUCCESS) {
+    free(pipe_rx);
+    free(pipe_tx);
+    pipe_rx = NULL;
+    pipe_tx = NULL;
+    pipe_rx_len = 0;
+    pipe_tx_len = 0;
+  }
+  //Encode assignment
+  uint8_t* assignment_payload = NULL;
+  size_t assignment_len = 0;
+  if ((assignment_payload = octopipes_cap_prepare_assign(cap_err, pipe_tx, pipe_tx_len - 1, pipe_rx, pipe_rx_len - 1, &assignment_len)) == NULL) {
+    free(pipe_rx);
+    free(pipe_tx);
+    octopipes_server_stop_worker(server, client);
+    return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+  }
+  free(pipe_rx);
+  free(pipe_tx);
+  //Send message
+  if ((rc = octopipes_server_write_cap(server, client, assignment_payload, assignment_len)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+    octopipes_server_stop_worker(server, client);
+    return rc;
+  }
+  //Free buffers
+  free(pipe_rx);
+  free(pipe_tx);
+  return rc;
+}
+
+/**
+ * @brief manage an unsubscription from a client message
+ * @param OctopipesServer* server
+ * @param char* client
+ * @param uint8_t* message payload
+ * @param size_t payload lenght
+ * @return OctopipesServerError
+ */
+
+OctopipesServerError cap_manage_unsubscription(OctopipesServer* server, const char* client, const uint8_t* payload, const size_t payload_len) {
+  //Parse unsubscription
+  OctopipesError ret;
+  if ((ret = octopipes_cap_parse_unsubscribe(payload, payload_len)) != OCTOPIPES_ERROR_SUCCESS) {
+    return to_server_error(ret);
+  }
+  //Unsubscribe client and stop associated worker
+  for (size_t i = 0; server->workers_len; i++) {
+    OctopipesServerWorker* this_worker = server->workers[i];
+    if (strcmp(this_worker->client_id, client) == 0) {
+      //Stop worker
+      OctopipesServerError rc = octopipes_server_stop_worker(server, client);
+      return rc;
+    }
+  }
+  return OCTOPIPES_SERVER_ERROR_WORKER_NOT_FOUND;
 }
 
 /**
@@ -382,7 +512,7 @@ OctopipesServerError octopipes_server_handle_cap_message(OctopipesServer* server
  * @return OctopipesServerError
  */
 
-OctopipesServerError octopipes_server_start_worker(OctopipesServer* server, const char* client, const char** subscriptions, const size_t subscription_len, const char* cli_tx_pipe, const char* cli_rx_pipe) {
+OctopipesServerError octopipes_server_start_worker(OctopipesServer* server, const char* client, char** subscriptions, const size_t subscription_len, const char* cli_tx_pipe, const char* cli_rx_pipe) {
   //Instance a new worker
   OctopipesServerWorker* new_worker;
   OctopipesServerError rc;
@@ -391,7 +521,7 @@ OctopipesServerError octopipes_server_start_worker(OctopipesServer* server, cons
     return OCTOPIPES_SERVER_ERROR_WORKER_EXISTS;
   }
   //Initialize a new worker
-  if ((rc = worker_init(&new_worker, subscriptions, subscription_len, client, cli_tx_pipe, cli_tx_pipe)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+  if ((rc = worker_init(&new_worker, (const char**) subscriptions, subscription_len, client, cli_tx_pipe, cli_tx_pipe)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
     return rc;
   }
   //Push worker to current workers
@@ -448,7 +578,7 @@ OctopipesServerError octopipes_server_stop_worker(OctopipesServer* server, const
  * @return OctopipesServerError
  */
 
-OctopipesServerError octopipes_server_dispatch_message(OctopipesServer* server, const OctopipesMessage* message, const char** worker) {
+OctopipesServerError octopipes_server_dispatch_message(OctopipesServer* server, OctopipesMessage* message, const char** worker) {
   //Check if remote is set
   *worker = NULL;
   if (message->remote == NULL) {
@@ -494,17 +624,16 @@ OctopipesServerError octopipes_server_process_first(OctopipesServer* server, siz
       OctopipesMessage* message = inbox_message->message;
       if (message != NULL) {
         if ((ret = octopipes_server_dispatch_message(server, message, client)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
-          octopipes_cleanup_message(message);
+          server_message_cleanup(inbox_message);
           return ret;
         }
-        octopipes_cleanup_message(message);
       } else {
         ret = inbox_message->error;
         *requests = *requests + 1;
-        free(inbox_message);
+        server_message_cleanup(inbox_message);
         return ret;
       }
-      free(inbox_message);
+      server_message_cleanup(inbox_message);
       //Otherwise message has been processed successfully
       *requests = *requests + 1;
       return ret;
@@ -539,17 +668,16 @@ OctopipesServerError octopipes_server_process_once(OctopipesServer* server, size
       OctopipesMessage* message = inbox_message->message;
       if (message != NULL) {
         if ((ret = octopipes_server_dispatch_message(server, message, client)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
-          octopipes_cleanup_message(message);
+          server_message_cleanup(inbox_message);
           return ret;
         }
-        octopipes_cleanup_message(message);
       } else {
         ret = inbox_message->error;
         *requests = *requests + 1;
-        free(inbox_message);
+        server_message_cleanup(inbox_message);
         return ret;
       }
-      free(inbox_message);
+      server_message_cleanup(inbox_message);
       //Otherwise message has been processed successfully
       *requests = *requests + 1;
       //Continue
@@ -652,7 +780,47 @@ OctopipesServerError octopipes_server_get_clients(OctopipesServer* server, char*
  */
 
 const char* octopipes_server_get_error_desc(const OctopipesServerError error) {
-  //TODO: implement
+  switch (error) {
+    case OCTOPIPES_SERVER_ERROR_BAD_ALLOC: 
+      return "Could not allocate more memory";
+    case OCTOPIPES_SERVER_ERROR_BAD_CHECKSUM:
+      return "Message has bad checksum";
+    case OCTOPIPES_SERVER_ERROR_BAD_CLIENT_DIR:
+      return "It was not possible to initialize the provided clients directory";
+    case OCTOPIPES_SERVER_ERROR_BAD_PACKET:
+      return "The received packet has an invalid syntax";
+    case OCTOPIPES_SERVER_ERROR_CAP_TIMEOUT:
+      return "CAP timeout";
+    case OCTOPIPES_SERVER_ERROR_NO_RECIPIENT:
+      return "The received message has no recipient, but it should had";
+    case OCTOPIPES_SERVER_ERROR_OPEN_FAILED:
+      return "Could not open or create the pipe";
+    case OCTOPIPES_SERVER_ERROR_READ_FAILED:
+      return "Could not read from pipe";
+    case OCTOPIPES_SERVER_ERROR_SUCCESS:
+      return "Not an error";
+    case OCTOPIPES_SERVER_ERROR_THREAD_ALREADY_RUNNING:
+      return "Thread is already running";
+    case OCTOPIPES_SERVER_ERROR_THREAD_ERROR:
+      return "There was an error in initializing the thread";
+    case OCTOPIPES_SERVER_ERROR_UNINITIALIZED:
+      return "Octopipes sever is not correctly initialized";
+    case OCTOPIPES_SERVER_ERROR_UNSUPPORTED_VERSION:
+      return "Unsupported protocol version";
+    case OCTOPIPES_SERVER_ERROR_WORKER_ALREADY_RUNNING:
+      return "A worker with these parameters is already running";
+    case OCTOPIPES_SERVER_ERROR_WORKER_EXISTS:
+      return "A worker with these parameters already exists";
+    case OCTOPIPES_SERVER_ERROR_WORKER_NOT_FOUND:
+      return "Could not find a worker with that name";
+    case OCTOPIPES_SERVER_ERROR_WORKER_NOT_RUNNING:
+      return "The requested worker is not running";
+    case OCTOPIPES_SERVER_ERROR_WRITE_FAILED:
+      return "Could not write to pipe";
+    case OCTOPIPES_SERVER_ERROR_UNKNOWN:
+    default:
+      return "Unknown error";
+  }
 }
 
 //Privates
@@ -664,6 +832,13 @@ const char* octopipes_server_get_error_desc(const OctopipesServerError error) {
  */
 
 OctopipesServerError worker_init(OctopipesServerWorker** worker, const char** subscriptions, const size_t sub_len, const char* client_id, const char* pipe_read, const char* pipe_write) {
+  //Try creating pipes
+  if (pipe_create(pipe_read) != OCTOPIPES_ERROR_SUCCESS) {
+    return OCTOPIPES_SERVER_ERROR_OPEN_FAILED;
+  }
+  if (pipe_create(pipe_write) != OCTOPIPES_ERROR_SUCCESS) {
+    return OCTOPIPES_SERVER_ERROR_OPEN_FAILED;
+  }
   OctopipesServerWorker* ptr = (OctopipesServerWorker*) malloc(sizeof(OctopipesServerWorker));
   if (ptr == NULL) {
     return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
@@ -782,6 +957,10 @@ OctopipesServerError worker_cleanup(OctopipesServerWorker* worker) {
     }
     pthread_mutex_destroy(&worker->worker_lock);
   }
+  //Delete pipes
+  pipe_delete(worker->pipe_read);
+  pipe_delete(worker->pipe_write);
+  //Free worker
   free(worker->client_id);
   //Delete subscription list
   for (size_t i = 0; i < worker->subscriptions; i++) {
@@ -809,8 +988,20 @@ OctopipesServerError worker_cleanup(OctopipesServerWorker* worker) {
  * @return OctopipesServerError
  */
 
-OctopipesServerError worker_send(OctopipesServerWorker* worker, const OctopipesMessage* message) {
-  //TODO: implement
+OctopipesServerError worker_send(OctopipesServerWorker* worker, OctopipesMessage* message) {
+  //Encode message
+  uint8_t* data_out;
+  size_t data_out_size;
+  OctopipesError ret;
+  if ((ret = octopipes_encode(message, &data_out, &data_out_size)) != OCTOPIPES_ERROR_SUCCESS) {
+    return to_server_error(ret);
+  }
+  if ((ret = pipe_send(worker->pipe_write, data_out, data_out_size, (message->ttl * 1000))) != OCTOPIPES_ERROR_SUCCESS) {
+    free(data_out);
+    return to_server_error(ret);
+  }
+  free(data_out);
+  return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
 
 /**
@@ -935,11 +1126,9 @@ OctopipesServerError message_inbox_expunge(OctopipesServerInbox* inbox) {
   for (size_t i = 0; i < inbox->inbox_len; i++) {
     OctopipesServerMessage* message = inbox->messages[i];
     //Cleanup message
-    if (message->message != NULL) {
-      octopipes_cleanup_message(message->message);
-    }
-    free(message);
+    server_message_cleanup(message);
   }
+  return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
 
 /**
@@ -1004,13 +1193,59 @@ OctopipesServerError message_inbox_remove(OctopipesServerInbox* inbox, const siz
 }
 
 /**
+ * @brief clean up a server message object
+ * @param OctopipesServerMessage*
+ * @return OctopipesServerError
+ */
+
+OctopipesServerError server_message_cleanup(OctopipesServerMessage* message) {
+  if (message == NULL) {
+    return OCTOPIPES_SERVER_ERROR_SUCCESS;
+  }
+  if (message->message != NULL) {
+    //Cleanup message
+    octopipes_cleanup_message(message->message);
+  }
+  free(message);
+  return OCTOPIPES_SERVER_ERROR_SUCCESS;
+}
+
+/**
  * @brief loop for CAP listener
  * @param void* args (pointer to server)
  * @return void*
  */
 
 void* cap_loop(void* args) {
-  //TODO:
+  OctopipesServer* server = (OctopipesServer*) args;
+  while (server->state != OCTOPIPES_SERVER_STATE_STOPPED) {
+    //If state is BLOCK, wait
+    while (server->state == OCTOPIPES_SERVER_STATE_BLOCK) {
+      usleep(TIME_100MS);
+    }
+    //Read from pipe
+    OctopipesError ret;
+    uint8_t* data_in;
+    size_t data_in_len;
+    if ((ret = pipe_receive(server->cap_pipe, &data_in, &data_in_len, 100)) == OCTOPIPES_ERROR_SUCCESS) {
+      //It's okay, try to decode packet
+      OctopipesMessage* message = NULL;
+      ret = octopipes_decode(data_in, data_in_len, &message);
+      free(data_in);
+      //Report message (or error)
+      pthread_mutex_lock(&server->cap_lock);
+      message_inbox_push(server->cap_inbox, message, to_server_error(ret));
+      pthread_mutex_unlock(&server->cap_lock);
+    } else {
+      if (ret != OCTOPIPES_ERROR_NO_DATA_AVAILABLE) {
+        //Report error
+        pthread_mutex_lock(&server->cap_lock);
+        message_inbox_push(server->cap_inbox, NULL, to_server_error(ret));
+        pthread_mutex_unlock(&server->cap_lock);
+      } //Else keep waiting
+    }
+    usleep(TIME_100MS);
+  }
   return NULL;
 }
 
@@ -1021,10 +1256,33 @@ void* cap_loop(void* args) {
  */
 
 void* worker_loop(void* args) {
-  //TODO:
+  OctopipesServerWorker* worker = (OctopipesServerWorker*) args;
+  while (worker->active) {
+    //Read from pipe
+    OctopipesError ret;
+    uint8_t* data_in;
+    size_t data_in_len;
+    if ((ret = pipe_receive(worker->pipe_read, &data_in, &data_in_len, 100)) == OCTOPIPES_ERROR_SUCCESS) {
+      //It's okay, try to decode packet
+      OctopipesMessage* message = NULL;
+      ret = octopipes_decode(data_in, data_in_len, &message);
+      free(data_in);
+      //Report message (or error)
+      pthread_mutex_lock(&worker->worker_lock);
+      message_inbox_push(worker->inbox, message, to_server_error(ret));
+      pthread_mutex_unlock(&worker->worker_lock);
+    } else {
+      if (ret != OCTOPIPES_ERROR_NO_DATA_AVAILABLE) {
+        //Report error
+        pthread_mutex_lock(&worker->worker_lock);
+        message_inbox_push(worker->inbox, NULL, to_server_error(ret));
+        pthread_mutex_unlock(&worker->worker_lock);
+      } //Else keep waiting
+    }
+    usleep(TIME_100MS);
+  }
   return NULL;
 }
-
 
 /**
  * @brief create and clean clients directory
@@ -1060,6 +1318,38 @@ int create_clients_dir(const char* directory) {
   return 0;
 }
 
+/**
+ * @brief convert an octopipes error to an octopipes server error
+ * @param OctopipesError
+ * @return OctopipesServerError
+ */
+
 OctopipesServerError to_server_error(const OctopipesError error) {
-  //TODO: implement
+  switch (error) {
+    case OCTOPIPES_ERROR_BAD_ALLOC:
+      return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+    case OCTOPIPES_ERROR_BAD_CHECKSUM:
+      return OCTOPIPES_SERVER_ERROR_BAD_CHECKSUM;
+    case OCTOPIPES_ERROR_BAD_PACKET:
+      return OCTOPIPES_SERVER_ERROR_BAD_PACKET;
+    case OCTOPIPES_ERROR_CAP_TIMEOUT:
+      return OCTOPIPES_SERVER_ERROR_CAP_TIMEOUT;
+    case OCTOPIPES_ERROR_OPEN_FAILED:
+      return OCTOPIPES_SERVER_ERROR_OPEN_FAILED;
+    case OCTOPIPES_ERROR_READ_FAILED:
+      return OCTOPIPES_SERVER_ERROR_READ_FAILED;
+    case OCTOPIPES_ERROR_SUCCESS:
+      return OCTOPIPES_SERVER_ERROR_SUCCESS;
+    case OCTOPIPES_ERROR_THREAD:
+      return OCTOPIPES_SERVER_ERROR_THREAD_ERROR;
+    case OCTOPIPES_ERROR_UNINITIALIZED:
+      return OCTOPIPES_SERVER_ERROR_UNINITIALIZED;
+    case OCTOPIPES_ERROR_UNSUPPORTED_VERSION:
+      return OCTOPIPES_SERVER_ERROR_UNSUPPORTED_VERSION;
+    case OCTOPIPES_ERROR_WRITE_FAILED:
+      return OCTOPIPES_SERVER_ERROR_WRITE_FAILED;
+    case OCTOPIPES_ERROR_UNKNOWN_ERROR:
+    default:
+      return OCTOPIPES_SERVER_ERROR_UNKNOWN;
+  }
 }
