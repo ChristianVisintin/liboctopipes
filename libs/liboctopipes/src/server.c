@@ -1304,9 +1304,16 @@ int create_clients_dir(const char* directory) {
   struct stat st = {0};
   if (stat(directory, &st) == -1) {
     //Create dir
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__NetBSD__) || defined(__gnu_linux__) || defined(__linux__) || defined(__APPLE__)
     if (mkdir(directory, 0755) != 0) {
       return 1;
     }
+#endif
+#ifdef _WIN32
+    if (mkdir(directory) != 0) {
+      return 1;
+    }
+#endif
   } else {
     //Directory already exists, clean directory
     DIR* dir;
@@ -1316,11 +1323,16 @@ int create_clients_dir(const char* directory) {
         return 1;
     }
     while((entry = readdir(dir)) != NULL) {
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__NetBSD__) || defined(__gnu_linux__) || defined(__linux__) || defined(__APPLE__)
         lstat(entry->d_name,&statbuf);
         if (!S_ISFIFO(statbuf.st_mode)) {
             //Remove file
             unlink(entry->d_name);
         }
+#endif
+#ifdef _WIN32
+      unlink(entry->d_name);
+#endif
     }
     closedir(dir);
   }
