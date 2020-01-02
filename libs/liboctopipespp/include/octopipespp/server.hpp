@@ -21,82 +21,43 @@
  * SOFTWARE.
 **/
 
-#ifndef OCTOPIPES_TYPESPP_HPP
-#define OCTOPIPES_TYPESPP_HPP
+#ifndef OCTOPIPESPP_SERVER_HPP
+#define OCTOPIPESPP_SERVER_HPP
 
-//Version defines
-#define OCTOPIPESPP_LIB_VERSION "0.1.0"
-#define OCTOPIPESPP_LIB_VERSION_MAJOR 0
-#define OCTOPIPESPP_LIB_VERSION_MINOR 1
+#include "typespp.hpp"
+#include "message.hpp"
 
-#include <cinttypes>
-#include <string>
+#include <functional>
+#include <list>
 
 namespace octopipes {
 
-enum class Error {
-  SUCCESS,
-  UNINITIALIZED,
-  BAD_PACKET,
-  BAD_CHECKSUM,
-  UNSUPPORTED_VERSION,
-  NO_DATA_AVAILABLE,
-  OPEN_FAILED,
-  WRITE_FAILED,
-  READ_FAILED,
-  CAP_TIMEOUT,
-  NOT_SUBSCRIBED,
-  NOT_UNSUBSCRIBED,
-  THREAD,
-  BAD_ALLOC,
-  UNKNOWN_ERROR
-};
+class Server {
 
-enum class CapMessage {
-  UNKNOWN = 0x00,
-  SUBSCRIPTION = 0x01,
-  ASSIGNMENT = 0xFF,
-  UNSUBSCRIPTION = 0x02
-};
+public:
+  Server(const std::string& cap_path, const std::string& client_dir, const ProtocolVersion version);
+  ~Server();
+  ServerError startCapListener();
+  ServerError stopCapListener();
+  ServerError processCapOnce(size_t& requests);
+  ServerError processCapAll(size_t& requests);
+  //Workers
+  ServerError startWorker(const std::string& client, const std::list<std::string>& subscriptions, const std::string& cli_tx_pipe, const std::string& cli_rx_pipe);
+  ServerError stopWorker(const std::string& client);
+  ServerError processFirst(size_t& requests, std::string& client);
+  ServerError processOnce(size_t& requests, std::string& client);
+  ServerError processAll(size_t& requests, std::string& client);
+  //Getters
+  bool isSubscribed(const std::string& client);
+  std::list<std::string> getSubscriptions(const std::string& client);
+  std::list<std::string> getClients();
+  //ServerError
+  static const std::string getServerErrorDesc(const ServerError error);
 
-enum class CapError {
-  SUCCESS = 0,
-  NAME_ALREADY_TAKEN = 1,
-  FS = 2,
-  UNKNOWN = 255
-};
+private:
+  //Class attributes
+  void* octopipes_server;
 
-enum class Options {
-  NONE = 0,
-  REQUIRE_ACK = 1,
-  ACK = 2,
-  IGNORE_CHECKSUM = 4
-};
-
-enum class ProtocolVersion {
-  VERSION_1 = 1
-};
-
-enum class ServerError {
-  SUCCESS,
-  BAD_ALLOC,
-  UNINITIALIZED,
-  BAD_PACKET,
-  BAD_CHECKSUM,
-  UNSUPPORTED_VERSION,
-  OPEN_FAILED,
-  WRITE_FAILED,
-  READ_FAILED,
-  CAP_TIMEOUT,
-  THREAD_ERROR,
-  THREAD_ALREADY_RUNNING,
-  WORKER_EXISTS,
-  WORKER_NOT_FOUND,
-  WORKER_ALREADY_RUNNING,
-  WORKER_NOT_RUNNING,
-  NO_RECIPIENT,
-  BAD_CLIENT_DIR,
-  UNKNOWN
 };
 
 }

@@ -21,7 +21,7 @@
  * SOFTWARE.
 **/
 
-#include <octopipespp/octopipespp.hpp>
+#include <octopipespp/client.hpp>
 #include <getopt.h>
 #include <cstring>
 

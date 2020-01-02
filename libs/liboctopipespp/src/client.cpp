@@ -21,11 +21,11 @@
  * SOFTWARE.
 **/
 
-#include <octopipespp/octopipespp.hpp>
+#include <octopipespp/client.hpp>
 
 #include <octopipes/octopipes.h>
 
-#define DEFAULT_TTL 0
+#define DEFAULT_TTL 60
 
 namespace octopipes {
   

@@ -21,7 +21,7 @@
  * SOFTWARE.
 **/
 
-#include <octopipespp/octopipespp.hpp>
+#include <octopipespp/client.hpp>
 
 #include <octopipes/octopipes.h>
 #include <octopipes/cap.h>
