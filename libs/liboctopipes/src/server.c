@@ -765,8 +765,12 @@ OctopipesServerError octopipes_server_get_subscriptions(OctopipesServer* server,
  */
 
 OctopipesServerError octopipes_server_get_clients(OctopipesServer* server, char*** clients, size_t* cli_len) {
+  if (server->workers_len == 0) {
+    *cli_len = 0;
+    return OCTOPIPES_SERVER_ERROR_SUCCESS;
+  }
   char** cli_ptr = (char**) malloc(sizeof(char*) * server->workers_len);
-  if (cli_len == NULL) {
+  if (cli_ptr == NULL) {
     return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
   }
   *cli_len = server->workers_len;
