@@ -75,14 +75,14 @@ OctopipesServerError octopipes_server_handle_cap_message(OctopipesServer* server
 //Workers
 OctopipesServerError octopipes_server_start_worker(OctopipesServer* server, const char* client, const char** subscriptions, const size_t subscription_len, const char* cli_tx_pipe, const char* cli_rx_pipe);
 OctopipesServerError octopipes_server_stop_worker(OctopipesServer* server, const char* client);
-OctopipesServerError octopipes_server_dispatch_message(OctopipesServer* server, const OctopipesMessage* message);
-OctopipesServerError octopipes_server_process_first(OctopipesServer* server, size_t* requests, char** client);
-OctopipesServerError octopipes_server_process_once(OctopipesServer* server, size_t* requests, char** client);
-OctopipesServerError octopipes_server_process_all(OctopipesServer* server, size_t* requests, char** client);
+OctopipesServerError octopipes_server_dispatch_message(OctopipesServer* server, const OctopipesMessage* message, const char** worker);
+OctopipesServerError octopipes_server_process_first(OctopipesServer* server, size_t* requests, const char** client);
+OctopipesServerError octopipes_server_process_once(OctopipesServer* server, size_t* requests, const char** client);
+OctopipesServerError octopipes_server_process_all(OctopipesServer* server, size_t* requests, const char** client);
 //Getters
 OctopipesServerError octopipes_server_is_subscribed(OctopipesServer* server, const char* client);
-OctopipesServerError octopipes_server_get_subscriptions(OctopipesServer* server, const char* client, char*** subscriptions);
-OctopipesServerError octopipes_server_get_clients(OctopipesServer* server, char*** clients);
+OctopipesServerError octopipes_server_get_subscriptions(OctopipesServer* server, const char* client, char*** subscriptions, size_t* sub_len);
+OctopipesServerError octopipes_server_get_clients(OctopipesServer* server, char*** clients, size_t* cli_len);
 
 //Errors
 const char* octopipes_get_error_desc(const OctopipesError error);

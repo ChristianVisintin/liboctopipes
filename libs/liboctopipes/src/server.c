@@ -36,9 +36,14 @@
 //Workers
 OctopipesServerError worker_init(OctopipesServerWorker** worker, const char** subcsriptions, const size_t sub_len, const char* client_id, const char* pipe_read, const char* pipe_write);
 OctopipesServerError worker_cleanup(OctopipesServerWorker* worker);
+OctopipesServerError worker_send(OctopipesServerWorker* worker, const OctopipesMessage* message);
+OctopipesServerError worker_get_next_message(OctopipesServerWorker* worker, OctopipesServerMessage** message);
+OctopipesServerError worker_get_subscriptions(OctopipesServerWorker* worker, char*** groups, size_t* groups_len);
+int worker_match_subscription(OctopipesServerWorker* worker, const char* remote);
 //Inbox
 OctopipesServerError message_inbox_init(OctopipesServerInbox** inbox);
 OctopipesServerError message_inbox_cleanup(OctopipesServerInbox* inbox);
+OctopipesServerMessage* message_inbox_dequeue(OctopipesServerInbox* inbox);
 OctopipesServerError message_inbox_expunge(OctopipesServerInbox* inbox);
 OctopipesServerError message_inbox_push(OctopipesServerInbox* inbox, OctopipesMessage* message, OctopipesServerError error);
 OctopipesServerError message_inbox_remove(OctopipesServerInbox* inbox, const size_t index);
@@ -138,17 +143,12 @@ OctopipesServerError octopipes_server_cleanup(OctopipesServer* server) {
     //Iterate over workers
     for (size_t i = 0; i < server->workers_len; i++) {
       OctopipesServerWorker* worker = server->workers[i];
-      worker->active = 0; //Set active to false
-      //Join worker
-      if (pthread_join(worker->worker_listener, NULL) != 0) {
-        return OCTOPIPES_SERVER_ERROR_THREAD_ERROR;
+      OctopipesServerError ret;
+      if ((ret = worker_cleanup(worker)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+        return ret;
       }
-      //Free inbox
-      if (worker->inbox != NULL) {
-        message_inbox_cleanup(worker->inbox);
-      }
-      free(worker);
     }
+    free(server->workers);
   }
   free(server);
   return OCTOPIPES_SERVER_ERROR_SUCCESS;
@@ -201,7 +201,7 @@ OctopipesServerError octopipes_server_stop_cap_listener(OctopipesServer* server)
     return OCTOPIPES_SERVER_ERROR_THREAD_ERROR;
   }
   pthread_mutex_destroy(&server->cap_lock);
-  return OCTOPIPES_ERROR_SUCCESS;
+  return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
 
 /**
@@ -306,24 +306,28 @@ OctopipesServerError octopipes_server_process_cap_once(OctopipesServer* server, 
     return OCTOPIPES_SERVER_ERROR_UNINITIALIZED;
   }
   if (server->cap_inbox != NULL) {
-    return OCTOPIPES_ERROR_UNINITIALIZED;
+    return OCTOPIPES_SERVER_ERROR_UNINITIALIZED;
   }
   //Lock cap listener
   pthread_mutex_lock(&server->cap_lock);
   //Process
   *requests = 0;
   OctopipesServerError rc;
-  if (server->cap_inbox->inbox_len > 0) {
-    OctopipesMessage* message = server->cap_inbox->messages[0];
-    //Process message
-    if ((rc = octopipes_server_handle_cap_message(server, message)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
-      return rc;
+  OctopipesServerMessage* message = message_inbox_dequeue(server->cap_inbox);
+  if (message != NULL) {
+    if (message->message == NULL) {
+      rc = server->cap_inbox->messages[0]->error;
+    } else {
+      //Process message
+      if ((rc = octopipes_server_handle_cap_message(server, message->message)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+        octopipes_cleanup_message(message->message);
+        free(message);
+        return rc;
+      }
+      octopipes_cleanup_message(message->message);
     }
-    //Remove message from CAP
-    if ((rc = message_inbox_remove(server->cap_inbox, 0)) != OCTOPIPES_SERVER_ERROR_SUCCESS) { //Remove first
-      return rc;
-    }
-    *requests++;
+    free(message);
+    *requests = *requests + 1;
   }
   //Unlock mutex
   pthread_mutex_unlock(&server->cap_lock);
@@ -341,7 +345,7 @@ OctopipesServerError octopipes_server_process_cap_all(OctopipesServer* server, s
     return OCTOPIPES_SERVER_ERROR_UNINITIALIZED;
   }
   if (server->cap_inbox != NULL) {
-    return OCTOPIPES_ERROR_UNINITIALIZED;
+    return OCTOPIPES_SERVER_ERROR_UNINITIALIZED;
   }
   *requests = 0;
   size_t this_session_requests = 0;
@@ -357,7 +361,9 @@ OctopipesServerError octopipes_server_process_cap_all(OctopipesServer* server, s
 }
 
 /**
- * @brief
+ * @brief handle a CAP message
+ * @param OctopipesServer* server
+ * @param OctopipesMessage* message
  * @return OctopipesServerError
  */
 
@@ -381,86 +387,262 @@ OctopipesServerError octopipes_server_start_worker(OctopipesServer* server, cons
   OctopipesServerWorker* new_worker;
   OctopipesServerError rc;
   //Check if a worker with that name exists
-  //TODO:
+  if (octopipes_server_is_subscribed(server, client) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+    return OCTOPIPES_SERVER_ERROR_WORKER_EXISTS;
+  }
   //Initialize a new worker
-  if ((rc = worker_init(&new_worker, client, subscriptions, subscription_len, cli_tx_pipe, cli_tx_pipe)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+  if ((rc = worker_init(&new_worker, subscriptions, subscription_len, client, cli_tx_pipe, cli_tx_pipe)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
     return rc;
   }
   //Push worker to current workers
-  //TODO:
+  server->workers = (OctopipesServerWorker**) realloc(server->workers, sizeof(OctopipesServerWorker*) * (server->workers_len + 1));
+  if (server->workers == NULL) {
+    return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+  }
+  server->workers[server->workers_len] = new_worker;
+  server->workers_len++;
   return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
 
 /**
- * @brief
+ * @brief stop a certain worker
+ * @param OctopipesServer* server
+ * @param char* client
  * @return OctopipesServerError
  */
 
 OctopipesServerError octopipes_server_stop_worker(OctopipesServer* server, const char* client) {
-  
+  OctopipesServerError rc;
+  //Iterate over workers
+  for (size_t i = 0; i < server->workers_len; i++) {
+    OctopipesServerWorker* curr_worker = server->workers[i];
+    //Check if curr worker is searched worker
+    if (strcmp(curr_worker->client_id, client) == 0) {
+      if ((rc = worker_cleanup(curr_worker)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+        return rc;
+      }
+      //Realloc
+      const size_t worker_index = i;
+      //Move all the elements backward of 1 position
+      server->workers_len--;
+      for (size_t j = worker_index; j < server->workers_len; j++) {
+        server->workers[j] = server->workers[j + 1];
+      }
+      //Reallocate workers
+      server->workers = (OctopipesServerWorker**) realloc(server->workers, sizeof(OctopipesServerWorker*) * server->workers_len);
+      if (server->workers == NULL) {
+        return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+      }
+      //OK
+      return OCTOPIPES_SERVER_ERROR_SUCCESS;
+    }
+  }
+  return OCTOPIPES_SERVER_ERROR_WORKER_NOT_FOUND;
 }
 
 /**
- * @brief
+ * @brief Dispatch a message to all the clients subscribed to the message remote
+ * @param OctopipesServer* server
+ * @param OctopipesMessage* message
+ * @param char** worker which failed in dispatching message (NOTE: DO NOT FREE)
  * @return OctopipesServerError
  */
 
-OctopipesServerError octopipes_server_dispatch_message(OctopipesServer* server, const OctopipesMessage* message) {
-  
+OctopipesServerError octopipes_server_dispatch_message(OctopipesServer* server, const OctopipesMessage* message, const char** worker) {
+  //Check if remote is set
+  *worker = NULL;
+  if (message->remote == NULL) {
+    return OCTOPIPES_SERVER_ERROR_NO_RECIPIENT;
+  }
+  //Iterate over workers
+  for (size_t i = 0; i < server->workers_len; i++) {
+    OctopipesServerError ret;
+    OctopipesServerWorker* this_worker = server->workers[i];
+    if (worker_match_subscription(this_worker, message->remote)) {
+      //If subscription matches, send message to client
+      if ((ret = worker_send(this_worker, message)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+        *worker = this_worker->client_id;
+        return ret;
+      }
+    }
+  }
+  return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
 
 /**
- * @brief
+ * @brief checks if a worker has a message to dispatch, once found a worker with a message in its inbox, it processes it and returns
+ * @param OctopipesServer* server
+ * @param size_t* processed requests
+ * @param char** client which returned an error (NOTE: DO NOT FREE)
  * @return OctopipesServerError
  */
 
-OctopipesServerError octopipes_server_process_first(OctopipesServer* server, size_t* requests, char** client) {
-  
+OctopipesServerError octopipes_server_process_first(OctopipesServer* server, size_t* requests, const char** client) {
+  //Iterate over workers to find one to process
+  *client = NULL;
+  *requests = 0;
+  for (size_t i = 0; i < server->workers_len; i++) {
+    OctopipesServerWorker* this_worker = server->workers[i];
+    OctopipesServerMessage* inbox_message = NULL;
+    OctopipesServerError ret;
+    if ((ret = worker_get_next_message(this_worker, &inbox_message)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+      *client = this_worker->client_id;
+      return ret;
+    }
+    if (inbox_message != NULL) {
+      //Dispatch message
+      OctopipesMessage* message = inbox_message->message;
+      if (message != NULL) {
+        if ((ret = octopipes_server_dispatch_message(server, message, client)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+          octopipes_cleanup_message(message);
+          return ret;
+        }
+        octopipes_cleanup_message(message);
+      } else {
+        ret = inbox_message->error;
+        *requests = *requests + 1;
+        free(inbox_message);
+        return ret;
+      }
+      free(inbox_message);
+      //Otherwise message has been processed successfully
+      *requests = *requests + 1;
+      return ret;
+    }
+    //Otherwise keep searching
+  }
+  return OCTOPIPES_SERVER_ERROR_SUCCESS; //No message processed
 }
 
 /**
- * @brief
+ * @brief for each worker try to dispatch a message in the inbox once
+ * @param OctopipesServer* server
+ * @param size_t* requests
+ * @param char** worker which returned error (NOTE: DO NOT FREE)
  * @return OctopipesServerError
  */
 
-OctopipesServerError octopipes_server_process_once(OctopipesServer* server, size_t* requests, char** client) {
-  
+OctopipesServerError octopipes_server_process_once(OctopipesServer* server, size_t* requests, const char** client) {
+  //Iterate over workers to find one to process
+  *client = NULL;
+  *requests = 0;
+  for (size_t i = 0; i < server->workers_len; i++) {
+    OctopipesServerWorker* this_worker = server->workers[i];
+    OctopipesServerMessage* inbox_message = NULL;
+    OctopipesServerError ret;
+    if ((ret = worker_get_next_message(this_worker, &inbox_message)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+      *client = this_worker->client_id;
+      return ret;
+    }
+    if (inbox_message != NULL) {
+      //Dispatch message
+      OctopipesMessage* message = inbox_message->message;
+      if (message != NULL) {
+        if ((ret = octopipes_server_dispatch_message(server, message, client)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+          octopipes_cleanup_message(message);
+          return ret;
+        }
+        octopipes_cleanup_message(message);
+      } else {
+        ret = inbox_message->error;
+        *requests = *requests + 1;
+        free(inbox_message);
+        return ret;
+      }
+      free(inbox_message);
+      //Otherwise message has been processed successfully
+      *requests = *requests + 1;
+      //Continue
+    }
+    //Otherwise keep searching
+  }
+  return OCTOPIPES_SERVER_ERROR_SUCCESS; //No message processed
 }
 
 /**
- * @brief
+ * @brief keep processing workers until all their inbox are empty
+ * @param OctopipesServer* server
+ * @param size_t* requests processed
+ * @param char** worker which returned error
  * @return OctopipesServerError
  */
 
-OctopipesServerError octopipes_server_process_all(OctopipesServer* server, size_t* requests, char** client) {
-  
+OctopipesServerError octopipes_server_process_all(OctopipesServer* server, size_t* requests, const char** client) {
+  *client = NULL;
+  *requests = 0;
+  size_t this_session_requests = 0;
+  do {
+    OctopipesServerError ret;
+    if ((ret = octopipes_server_process_once(server, &this_session_requests, client)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+      return ret;
+    }
+    *requests += this_session_requests; //Increment processed requests
+  } while(this_session_requests > 0);
+  return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
 
 /**
- * @brief
- * @return OctopipesServerError
+ * @brief checks if a certain client is subscribed to the server
+ * @param OctopipesServer* server
+ * @param char* client
+ * @return OctopipesServerError (NOTE: SUCCESS if exists)
  */
 
 OctopipesServerError octopipes_server_is_subscribed(OctopipesServer* server, const char* client) {
-  
+  //Iterate over workers
+  for (size_t i = 0; i < server->workers_len; i++) {
+    OctopipesServerWorker* this_worker = server->workers[i];
+    if (strcmp(this_worker->client_id, client) == 0) {
+      return OCTOPIPES_SERVER_ERROR_SUCCESS;
+    }
+  }
+  return OCTOPIPES_SERVER_ERROR_WORKER_NOT_FOUND;
 }
 
 /**
- * @brief
+ * @brief get all the subscriptions for a certain worker
+ * @param char* client
+ * @param char*** subscriptions (NOTE: DO NOT FREE)
+ * @param size_t* subscriptions length
  * @return OctopipesServerError
  */
 
-OctopipesServerError octopipes_server_get_subscriptions(OctopipesServer* server, const char* client, char*** subscriptions) {
-  
+OctopipesServerError octopipes_server_get_subscriptions(OctopipesServer* server, const char* client, char*** subscriptions, size_t* sub_len) {
+  //Iterate over workers
+  *subscriptions = NULL;
+  *sub_len = 0;
+  for (size_t i = 0; i < server->workers_len; i++) {
+    OctopipesServerWorker* this_worker = server->workers[i];
+    if (strcmp(this_worker->client_id, client) == 0) {
+      //Okay, get subscriptions for this worker
+      OctopipesServerError ret;
+      ret = worker_get_subscriptions(this_worker, subscriptions, sub_len);
+      return ret;
+    }
+  }
+  return OCTOPIPES_SERVER_ERROR_WORKER_NOT_FOUND;
 }
 
 /**
- * @brief
+ * @brief returns all the clients subscribed to the server at the moment
+ * @param OctopipesServer* server
+ * @param char*** clients (NOTE: FREE char**, but not the content)
+ * @param size_t* clients length
  * @return OctopipesServerError
  */
 
-OctopipesServerError octopipes_server_get_clients(OctopipesServer* server, char*** clients) {
-  
+OctopipesServerError octopipes_server_get_clients(OctopipesServer* server, char*** clients, size_t* cli_len) {
+  char** cli_ptr = (char**) malloc(sizeof(char*) * server->workers_len);
+  if (cli_len == NULL) {
+    return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+  }
+  *cli_len = server->workers_len;
+  for (size_t i = 0; i < server->workers_len; i++) {
+    OctopipesServerWorker* this_worker = server->workers[i];
+    cli_ptr[i] = this_worker->client_id;
+  }
+  *clients = cli_ptr;
+  return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
 
 /**
@@ -470,7 +652,7 @@ OctopipesServerError octopipes_server_get_clients(OctopipesServer* server, char*
  */
 
 const char* octopipes_server_get_error_desc(const OctopipesServerError error) {
-
+  //TODO: implement
 }
 
 //Privates
@@ -561,7 +743,7 @@ worker_bad_alloc:
   if (ptr->subscriptions_list != NULL) {
     free(ptr->subscriptions_list);
   }
-  return OCTOPIPES_ERROR_BAD_ALLOC;
+  return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
 worker_thread_error:
   if (ptr->client_id != NULL) {
     free(ptr->client_id);
@@ -621,6 +803,76 @@ OctopipesServerError worker_cleanup(OctopipesServerWorker* worker) {
 }
 
 /**
+ * @brief send a message to the client associated to this worker
+ * @param OctopipesServerWorker* worker
+ * @param OctopipesMessage* message to send
+ * @return OctopipesServerError
+ */
+
+OctopipesServerError worker_send(OctopipesServerWorker* worker, const OctopipesMessage* message) {
+  //TODO: implement
+}
+
+/**
+ * @brief
+ * @param OctopipesServerWorker* worker
+ * @param OctopipesMessage** message out
+ * @return OctopipesServerError
+ */
+
+OctopipesServerError worker_get_next_message(OctopipesServerWorker* worker, OctopipesServerMessage** message) {
+  //Initialize message
+  *message = NULL;
+  //Lock mutex
+  pthread_mutex_lock(&worker->worker_lock);
+  //Deque inbox
+  OctopipesServerMessage* inbox_msg = message_inbox_dequeue(worker->inbox);
+  //Unlock mutex
+  pthread_mutex_unlock(&worker->worker_lock);
+  //Return OK
+  *message = inbox_msg;
+  return OCTOPIPES_SERVER_ERROR_SUCCESS;
+}
+
+/**
+ * @brief get a worker subscriptions list
+ * @param OctopipesServerWorker*
+ * @param char*** groups (NOTE: FREE char**, not the content)
+ * @param size_t* groups length
+ * @return OctopipesServerError
+ */
+
+OctopipesServerError worker_get_subscriptions(OctopipesServerWorker* worker, char*** groups, size_t* groups_len) {
+  char** subs = (char**) malloc(sizeof(char*) * worker->subscriptions);
+  if (subs == NULL) {
+    return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+  }
+  for (size_t i = 0; i < worker->subscriptions; i++) {
+    subs[i] = worker->subscriptions_list[i];
+  }
+  *groups = subs;
+  *groups_len = worker->subscriptions;
+  return OCTOPIPES_SERVER_ERROR_SUCCESS;
+}
+
+/**
+ * @brief checks if a certain remote is in a worker subscription list
+ * @param OctopipesServerWorker*
+ * @param char* remote
+ * @return int
+ */
+
+int worker_match_subscription(OctopipesServerWorker* worker, const char* remote) {
+  for (size_t i = 0; i < worker->subscriptions; i++) {
+    if (strcmp(worker->subscriptions_list[i], remote) == 0) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+/**
  * @brief initialize a message inbox
  * @param OctopipesServerInbox**
  * @return OctopipesServerError
@@ -650,6 +902,27 @@ OctopipesServerError message_inbox_cleanup(OctopipesServerInbox* inbox) {
   }
   free(inbox);
   return OCTOPIPES_SERVER_ERROR_SUCCESS;
+}
+
+/**
+ * @brief get the first message from the inbox and remove it from the message queue
+ * @param OctopipesServerInbox*
+ * @return OctopipesMessage* (or NULL if empty)
+ */
+
+OctopipesServerMessage* message_inbox_dequeue(OctopipesServerInbox* inbox) {
+  if (inbox->inbox_len == 0) {
+    return NULL;
+  }
+  OctopipesServerMessage* ret = inbox->messages[0];
+  //Move all the following messages one position behind
+  const size_t new_inbox_len = inbox->inbox_len - 1;
+  for (size_t i = 0; i < new_inbox_len; i++) {
+    inbox[i] = inbox[i + 1];
+  }
+  //Reallocate messages
+  inbox->messages = (OctopipesServerMessage**) realloc(inbox->messages, sizeof(OctopipesServerMessage*) * new_inbox_len);
+  return ret;
 }
 
 /**
