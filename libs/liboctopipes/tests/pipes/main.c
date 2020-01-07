@@ -33,7 +33,7 @@
 
 #define PROGRAM_NAME "test_pipes"
 #define USAGE PROGRAM_NAME "Usage: " PROGRAM_NAME " [Options]\n\
-\t -t <txPipePath>\tSpecify RX Pipe for this instance\n\
+\t -t <txPipePath>\tSpecify TX Pipe for this instance\n\
 \t -r <rxPipePath>\tSpecify RX Pipe for this instance\n\
 \t -h\t\tShow this page\n\
 "
@@ -93,7 +93,7 @@ static char* gen_rand_string(char* str, size_t size) {
  */
 
 int main_parent(const char* txPipe, const char* rxPipe) {
-  printf("%sPARENT: Starting main in 3 seconds%s\n", KYEL, KNRM);
+  printf("%sPARENT: Starting main in 3.0 seconds%s\n", KYEL, KNRM);
   sleep(3);
   size_t buffer_size = 16; //Will be multiplied by two at each step
   unsigned long int total_time_elapsed = 0;
@@ -152,8 +152,8 @@ int main_parent(const char* txPipe, const char* rxPipe) {
  */
 
 int main_child(const char* txPipe, const char* rxPipe) {
-  printf("%sCHILD: Starting main in 3 seconds%s\n", KCYN, KNRM);
-  sleep(3);
+  printf("%sCHILD: Starting main in 2.8 seconds%s\n", KCYN, KNRM);
+  usleep(2800000);
   unsigned long int total_time_elapsed = 0;
   for (int i = 0; i < WRITES_AMOUNT; i++) {
     struct timeval start, end, start2, end2;

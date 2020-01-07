@@ -293,8 +293,8 @@ int main_client() {
  */
 
 int main_server() {
-  printf("%sCHILD (server): Starting main in 2 seconds%s\n", KCYN, KNRM);
-  sleep(2);
+  printf("%sCHILD (server): Starting main in 2.8 seconds%s\n", KCYN, KNRM);
+  usleep(2800000);
   unsigned long int total_time_elapsed = 0;
   bool client_unsubscribed = false;
   //Read from pipes
@@ -324,7 +324,6 @@ int main_server() {
         free(data_in);
         continue;
       }
-      free(data_in);
       //Parse message
       OctopipesCapMessage message_type = octopipes_cap_get_message(message->data, message->data_size);
       //Switch on message type
@@ -337,6 +336,7 @@ int main_server() {
           if ((ret = octopipes_cap_parse_subscribe(data_in, data_in_size, &groups, &groups_amount)) != OCTOPIPES_ERROR_SUCCESS) {
             printf("%sCould not parse subscribe message: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
             octopipes_cleanup_message(message);
+            free(data_in);
             return 1;
           }
           printf("%sSUBSCRIBE message successfully parsed%s\n", KCYN, KNRM);
@@ -358,15 +358,13 @@ int main_server() {
             printf("%sCould not allocate assignment message%s\n", KRED, KNRM);
             free(out_payload);
             octopipes_cleanup_message(message);
+            free(data_in);
             return 1;
           }
-          char* remote = new char[CLIENT_NAME_SIZE + 1];
-          memcpy(remote, CLIENT_NAME, CLIENT_NAME_SIZE);
-          remote[CLIENT_NAME_SIZE] = 0x00;
           assignment_message->version = OCTOPIPES_VERSION_1;
           assignment_message->origin = NULL;
           assignment_message->origin_size = 0; //Server
-          assignment_message->remote = remote;
+          assignment_message->remote = CLIENT_NAME;
           assignment_message->remote_size = CLIENT_NAME_SIZE;
           assignment_message->ttl = 60;
           assignment_message->data_size = out_payload_size;
@@ -379,10 +377,8 @@ int main_server() {
           printf("%sEncoding ASSIGNMENT message%s\n", KCYN, KNRM);
           if ((ret = octopipes_encode(assignment_message, &out_data, &out_data_size)) != OCTOPIPES_ERROR_SUCCESS) {
             printf("%sCould not encode assignment message: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
-            delete[] remote;
             free(assignment_message);
           }
-          delete[] remote;
           free(assignment_message);
           free(out_payload);
           //Send assignment
@@ -396,6 +392,7 @@ int main_server() {
             printf("%sCould not send assignment to client: %s%s\n", KRED, octopipes_get_error_desc(ret), KNRM);
             free(out_data);
             octopipes_cleanup_message(message);
+            free(data_in);
             return 1;
           }
           gettimeofday(&t_write, NULL);
@@ -412,6 +409,7 @@ int main_server() {
           if ((ret = octopipes_cap_parse_unsubscribe(message->data, message->data_size)) != OCTOPIPES_ERROR_SUCCESS) {
             printf("%sCould not parse unsubscribe message%s\n", KRED, KNRM);
             octopipes_cleanup_message(message);
+            free(data_in);
             return 1;
           }
           client_unsubscribed = true;
@@ -426,6 +424,7 @@ int main_server() {
       }
       //Cleanup message
       octopipes_cleanup_message(message);
+      free(data_in);
     } else if (ret == OCTOPIPES_ERROR_NO_DATA_AVAILABLE) {
       printf("%sThere is no data available%s\n", KCYN, KNRM);
       continue;

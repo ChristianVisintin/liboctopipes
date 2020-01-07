@@ -74,18 +74,28 @@ OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size,
     //Open failed
     return OCTOPIPES_ERROR_OPEN_FAILED;
   }
-  fds[0].events = POLLIN;
+  fds[0].events = POLLIN | POLLRDBAND | POLLHUP;
   int time_elapsed = 0;
+  const int poll_time = 50;
   //Poll FIFO
   while (time_elapsed < timeout) {
-    ret = poll(fds, 1, 50);
+    ret = poll(fds, 1, poll_time);
     if (ret > 0) {
       // Fifo is available to be read
-      if (fds[0].revents & POLLIN) {
+      if ((fds[0].revents & POLLIN) || (fds[0].revents & POLLRDBAND)) {
         //Read from FIFO
         uint8_t buffer[2048];
         const size_t bytes_read = read(fds[0].fd, buffer, 2048);
         if (bytes_read == -1) {
+          if (errno == EAGAIN) { //No more data available
+          //Break if no data is available (only if data is null, otherwise keep waiting)
+            if (*data == NULL) {
+              time_elapsed += poll_time; //Sum time only if no data was received (in order to prevent data cut)
+              continue; //Keep waiting for data
+            } else {
+              break; //Exit
+            }
+          }
           rc = OCTOPIPES_ERROR_READ_FAILED;
           break;
         }
@@ -106,18 +116,32 @@ OctopipesError pipe_receive(const char* fifo, uint8_t** data, size_t* data_size,
         //FIFO is in error state
         rc = OCTOPIPES_ERROR_READ_FAILED;
         break;
+      } else if (fds[0].revents & POLLHUP) {
+        //Break if no data is available (only if data is null, otherwise keep waiting)
+        if (*data == NULL) {
+          time_elapsed += poll_time; //Sum time only if no data was received (in order to prevent data cut)
+          continue; //Keep waiting for data
+        } else {
+          break; //Exit
+        }
       }
     } else if (ret == 0) {
-      //Break if no data is available
+      //Break if no data is available (only if data is null, otherwise keep waiting)
       if (*data == NULL) {
-        time_elapsed += 100; //Sum time only if no data was received (in order to prevent data cut)
+        time_elapsed += poll_time; //Sum time only if no data was received (in order to prevent data cut)
         continue; //Keep waiting for data
       } else {
         break; //Exit
       }
     } else { //Ret == -1
       if (errno == EAGAIN) {
-        //Break if no data is available
+        //Break if no data is available (only if data is null, otherwise keep waiting)
+        if (*data == NULL) {
+          time_elapsed += poll_time; //Sum time only if no data was received (in order to prevent data cut)
+          continue; //Keep waiting for data
+        } else {
+          break; //Exit
+        }
       } else {
         //Set error state
         rc = OCTOPIPES_ERROR_READ_FAILED;
