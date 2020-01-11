@@ -192,7 +192,15 @@ OctopipesError pipe_send(const char* fifo, const uint8_t* data, const size_t dat
   OctopipesError rc = OCTOPIPES_ERROR_NO_DATA_AVAILABLE;
   size_t total_bytes_written = 0; //Must be == data_size to succeed
   //Open FIFO
-  fds[0].fd = open(fifo, O_RDWR | O_NONBLOCK);
+  time_t elapsed_time = 0;
+  while (elapsed_time < timeout) {
+    fds[0].fd = open(fifo, O_WRONLY | O_NONBLOCK); //Keep trying opening the pipe
+    if (fds[0].fd != -1) {
+      break;
+    }
+    elapsed_time += 50;
+    usleep(50000); //50ms
+  }
   if (fds[0].fd == -1) {
     //Open failed
     return OCTOPIPES_ERROR_OPEN_FAILED;
