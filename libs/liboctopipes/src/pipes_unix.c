@@ -40,7 +40,15 @@
  */
 
 OctopipesError pipe_create(const char* fifo) {
-  return (mkfifo(fifo, 0666) == 0) ? OCTOPIPES_ERROR_SUCCESS : OCTOPIPES_ERROR_OPEN_FAILED;
+  if (mkfifo(fifo, 0666) == 0) {
+    return OCTOPIPES_ERROR_SUCCESS;
+  } else {
+    if (errno == EEXIST) { //If file exists, return OK
+      return OCTOPIPES_ERROR_SUCCESS;
+    } else {
+      return OCTOPIPES_ERROR_OPEN_FAILED;
+    }
+  }
 }
 
 /**
@@ -50,7 +58,15 @@ OctopipesError pipe_create(const char* fifo) {
  */
 
 OctopipesError pipe_delete(const char* fifo) {
-  return (unlink(fifo) == 0) ? OCTOPIPES_ERROR_SUCCESS : OCTOPIPES_ERROR_OPEN_FAILED;
+  if (unlink(fifo) == 0) {
+    return OCTOPIPES_ERROR_SUCCESS;
+  } else {
+    if (errno == ENOENT) {
+      return OCTOPIPES_ERROR_SUCCESS;
+    } else {
+      return OCTOPIPES_ERROR_OPEN_FAILED;
+    }
+  }
 }
 
 /**
