@@ -146,21 +146,26 @@ OctopipesServerError octopipes_server_cleanup(OctopipesServer* server) {
   if (server == NULL) {
     return OCTOPIPES_SERVER_ERROR_SUCCESS;
   }
+  OctopipesServerError ret;
   if (server->state == OCTOPIPES_SERVER_STATE_RUNNING) {
-    server->state = OCTOPIPES_SERVER_STATE_STOPPED; //Stop CAP listener
-    if (pthread_join(server->cap_listener, NULL) != 0) {
-      return OCTOPIPES_SERVER_ERROR_THREAD_ERROR;
+    if ((ret = octopipes_server_stop_cap_listener(server)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+      return ret;
     }
     //Iterate over workers
     for (size_t i = 0; i < server->workers_len; i++) {
       OctopipesServerWorker* worker = server->workers[i];
-      OctopipesServerError ret;
       if ((ret = worker_cleanup(worker)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
         return ret;
       }
     }
     free(server->workers);
   }
+  //Try Free client directory
+  rmdir(server->client_folder);
+  //Free buffers
+  free(server->client_folder);
+  free(server->cap_pipe);
+  //Free server itself
   free(server);
   return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
@@ -205,13 +210,14 @@ OctopipesServerError octopipes_server_stop_cap_listener(OctopipesServer* server)
   if (server->state != OCTOPIPES_SERVER_STATE_RUNNING) {
     return OCTOPIPES_SERVER_ERROR_UNINITIALIZED;
   }
-  //Set state to running
-  server->state = OCTOPIPES_SERVER_STATE_RUNNING;
+  //Set state to STOPPED
+  server->state = OCTOPIPES_SERVER_STATE_STOPPED;
   //Join CAP listener
   if (pthread_join(server->cap_listener, NULL) != 0) {
     return OCTOPIPES_SERVER_ERROR_THREAD_ERROR;
   }
   pthread_mutex_destroy(&server->cap_lock);
+  pipe_delete(server->cap_pipe);
   return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
 
@@ -263,6 +269,7 @@ OctopipesServerError octopipes_server_write_cap(OctopipesServer* server, const c
   if (message == NULL) {
     return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
   }
+  message->version = server->version;
   message->data = NULL;
   message->origin = NULL; //None, server has no origin
   message->origin_size = 0;
@@ -299,6 +306,7 @@ OctopipesServerError octopipes_server_write_cap(OctopipesServer* server, const c
   //Write message
   if ((err = pipe_send(server->cap_pipe, data_out, data_out_size, 5000)) != OCTOPIPES_ERROR_SUCCESS) {
     free(data_out);
+    octopipes_server_unlock_cap(server);
     return to_server_error(err);
   }
   //Unlock pipe
@@ -316,7 +324,7 @@ OctopipesServerError octopipes_server_process_cap_once(OctopipesServer* server, 
   if (server->state != OCTOPIPES_SERVER_STATE_RUNNING) {
     return OCTOPIPES_SERVER_ERROR_UNINITIALIZED;
   }
-  if (server->cap_inbox != NULL) {
+  if (server->cap_inbox == NULL) {
     return OCTOPIPES_SERVER_ERROR_UNINITIALIZED;
   }
   //Lock cap listener
@@ -410,7 +418,7 @@ OctopipesServerError cap_manage_subscription(OctopipesServer* server, const char
   //Parse subscription
   OctopipesError ret;
   char** groups = NULL;
-  size_t groups_len;
+  size_t groups_len = 0;
   if ((ret = octopipes_cap_parse_subscribe(payload, payload_len, &groups, &groups_len)) != OCTOPIPES_ERROR_SUCCESS) {
     return to_server_error(ret);
   }
@@ -428,54 +436,76 @@ OctopipesServerError cap_manage_subscription(OctopipesServer* server, const char
     return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
   }
   sprintf(pipe_rx, "%s/%s_rx.fifo", server->client_folder, client);
-  //Create worker
-  OctopipesServerError rc;
-  OctopipesCapError cap_err = OCTOPIPES_CAP_ERROR_SUCCESS;
-  if ((rc = octopipes_server_start_worker(server, client, groups, groups_len, pipe_tx, pipe_rx)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
-    free(pipe_rx);
-    free(pipe_tx);
-    for (size_t i = 0; i < groups_len; i++) {
-      free(groups[i]);
-    }
-    free(groups);
-    cap_err = OCTOPIPES_CAP_ERROR_FS;
-  }
-  //Free groups
-  for (size_t i = 0; i < groups_len; i++) {
-    free(groups[i]);
-  }
-  free(groups);
   //Check if worker already exists
-  if (octopipes_server_is_subscribed(server, client) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+  OctopipesCapError cap_err = OCTOPIPES_CAP_ERROR_SUCCESS;
+  if (octopipes_server_is_subscribed(server, client) == OCTOPIPES_SERVER_ERROR_SUCCESS) {
     cap_err = OCTOPIPES_CAP_ERROR_NAME_ALREADY_TAKEN;
   }
   if (cap_err != OCTOPIPES_CAP_ERROR_SUCCESS) {
-    free(pipe_rx);
-    free(pipe_tx);
+    if (pipe_rx == NULL) {
+      free(pipe_rx);
+    }
+    if (pipe_tx == NULL) {
+      free(pipe_tx);
+    }
     pipe_rx = NULL;
     pipe_tx = NULL;
     pipe_rx_len = 0;
     pipe_tx_len = 0;
   }
+  //Create worker
+  OctopipesServerError rc;
+  if ((rc = octopipes_server_start_worker(server, client, groups, groups_len, pipe_tx, pipe_rx)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+    if (pipe_rx == NULL) {
+      free(pipe_rx);
+    }
+    if (pipe_tx == NULL) {
+      free(pipe_tx);
+    }
+    for (size_t i = 0; i < groups_len; i++) {
+      free((groups)[i]);
+    }
+    if (groups != NULL) {
+      free(groups);
+    }
+    cap_err = OCTOPIPES_CAP_ERROR_FS;
+    groups = NULL;
+    groups_len = 0;
+  }
+  //Free groups
+  for (size_t i = 0; i < groups_len; i++) {
+    free((groups)[i]);
+  }
+  if (groups != NULL) {
+    free(groups);
+  }
   //Encode assignment
   uint8_t* assignment_payload = NULL;
   size_t assignment_len = 0;
   if ((assignment_payload = octopipes_cap_prepare_assign(cap_err, pipe_tx, pipe_tx_len - 1, pipe_rx, pipe_rx_len - 1, &assignment_len)) == NULL) {
-    free(pipe_rx);
-    free(pipe_tx);
+    if (pipe_rx == NULL) {
+      free(pipe_rx);
+    }
+    if (pipe_tx == NULL) {
+      free(pipe_tx);
+    }
     octopipes_server_stop_worker(server, client);
     return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
   }
-  free(pipe_rx);
-  free(pipe_tx);
+  if (pipe_rx == NULL) {
+    free(pipe_rx);
+  }
+  if (pipe_tx == NULL) {
+    free(pipe_tx);
+  }
   //Send message
   if ((rc = octopipes_server_write_cap(server, client, assignment_payload, assignment_len)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
     octopipes_server_stop_worker(server, client);
+    free(assignment_payload);
     return rc;
   }
   //Free buffers
-  free(pipe_rx);
-  free(pipe_tx);
+  free(assignment_payload);
   return rc;
 }
 
@@ -522,11 +552,11 @@ OctopipesServerError octopipes_server_start_worker(OctopipesServer* server, cons
   OctopipesServerWorker* new_worker;
   OctopipesServerError rc;
   //Check if a worker with that name exists
-  if (octopipes_server_is_subscribed(server, client) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+  if (octopipes_server_is_subscribed(server, client) == OCTOPIPES_SERVER_ERROR_SUCCESS) {
     return OCTOPIPES_SERVER_ERROR_WORKER_EXISTS;
   }
   //Initialize a new worker
-  if ((rc = worker_init(&new_worker, (const char**) subscriptions, subscription_len, client, cli_tx_pipe, cli_tx_pipe)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+  if ((rc = worker_init(&new_worker, (const char**) subscriptions, subscription_len, client, cli_tx_pipe, cli_rx_pipe)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
     return rc;
   }
   //Push worker to current workers
@@ -859,6 +889,10 @@ OctopipesServerError worker_init(OctopipesServerWorker** worker, const char** su
   ptr->pipe_write = NULL;
   ptr->subscriptions_list = NULL;
   ptr->subscriptions = 0;
+  //Init inbox
+  if (message_inbox_init(&ptr->inbox) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+    goto worker_bad_alloc;
+  }
   //Copy clid
   const size_t clid_len = strlen(client_id);
   ptr->client_id = (char*) malloc(sizeof(char) * (clid_len + 1));
@@ -884,7 +918,7 @@ OctopipesServerError worker_init(OctopipesServerWorker** worker, const char** su
   memcpy(ptr->pipe_write, pipe_write, pipew_len);
   ptr->pipe_write[pipew_len] = 0x00;
   //Copy subscription list
-  ptr->subscriptions_list = (char**) malloc(sizeof(char*) * sub_len);
+  ptr->subscriptions_list = (char**) malloc(sizeof(char*) * (sub_len + 1));
   if (ptr->subscriptions_list == NULL) {
     goto worker_bad_alloc;
   }
@@ -898,14 +932,20 @@ OctopipesServerError worker_init(OctopipesServerWorker** worker, const char** su
     (ptr->subscriptions_list[i])[this_sub_len] = 0x00;
     ptr->subscriptions++;
   }
+  ptr->subscriptions_list[sub_len] = (char*) malloc(sizeof(char*) * (clid_len + 1));
+  memcpy((ptr->subscriptions_list)[sub_len], ptr->client_id, clid_len);
+  ((ptr->subscriptions_list)[sub_len])[clid_len] = 0x00;
+  ptr->subscriptions = sub_len + 1;
   //Create mutex
   if (pthread_mutex_init(&ptr->worker_lock, NULL) != 0) {
     goto worker_thread_error;
   }
   //Start thread
+  ptr->active = 1;
   if (pthread_create(&ptr->worker_listener, NULL, worker_loop, ptr) != 0) {
     goto worker_thread_error;
   }
+  *worker = ptr;
   return OCTOPIPES_SERVER_ERROR_SUCCESS;
 
 worker_bad_alloc:
@@ -982,7 +1022,7 @@ OctopipesServerError worker_cleanup(OctopipesServerWorker* worker) {
   free(worker->pipe_write);
   //Free inbox
   OctopipesServerError rc;
-  if ((rc =message_inbox_cleanup(worker->inbox)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+  if ((rc = message_inbox_cleanup(worker->inbox)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
     return rc;
   }
   //Eventually free worker and return
@@ -1122,6 +1162,7 @@ OctopipesServerMessage* message_inbox_dequeue(OctopipesServerInbox* inbox) {
   }
   //Reallocate messages
   inbox->messages = (OctopipesServerMessage**) realloc(inbox->messages, sizeof(OctopipesServerMessage*) * new_inbox_len);
+  inbox->inbox_len = new_inbox_len;
   return ret;
 }
 
@@ -1137,6 +1178,7 @@ OctopipesServerError message_inbox_expunge(OctopipesServerInbox* inbox) {
     //Cleanup message
     server_message_cleanup(message);
   }
+  inbox->inbox_len = 0;
   return OCTOPIPES_SERVER_ERROR_SUCCESS;
 }
 
@@ -1236,7 +1278,7 @@ void* cap_loop(void* args) {
     OctopipesError ret;
     uint8_t* data_in;
     size_t data_in_len;
-    if ((ret = pipe_receive(server->cap_pipe, &data_in, &data_in_len, 100)) == OCTOPIPES_ERROR_SUCCESS) {
+    if ((ret = pipe_receive(server->cap_pipe, &data_in, &data_in_len, 200)) == OCTOPIPES_ERROR_SUCCESS) {
       //It's okay, try to decode packet
       OctopipesMessage* message = NULL;
       ret = octopipes_decode(data_in, data_in_len, &message);
@@ -1271,7 +1313,7 @@ void* worker_loop(void* args) {
     OctopipesError ret;
     uint8_t* data_in;
     size_t data_in_len;
-    if ((ret = pipe_receive(worker->pipe_read, &data_in, &data_in_len, 100)) == OCTOPIPES_ERROR_SUCCESS) {
+    if ((ret = pipe_receive(worker->pipe_read, &data_in, &data_in_len, 200)) == OCTOPIPES_ERROR_SUCCESS) {
       //It's okay, try to decode packet
       OctopipesMessage* message = NULL;
       ret = octopipes_decode(data_in, data_in_len, &message);
