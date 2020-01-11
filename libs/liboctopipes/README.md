@@ -98,7 +98,63 @@ Two clients implementation can be found in and are provided with liboctopipes [H
 
 ## Server Implementation
 
-TBD
+Initialize the server.
+These parameters are required:
+
+- CAP pipe path
+- Directory where the clients pipes will be stored (if doesn't exist, will be created)
+- Protocol version
+
+```c
+OctopipesServer* octopipesServer;
+if ((error = octopipes_server_init(&octopipesServer, cap_path, client_folder, OCTOPIPES_VERSION_1)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+  printf("Could not allocate server: %s\n", octopipes_server_get_error_desc(error));
+}
+```
+
+Start the CAP listener (in order to receive message on the CAP)
+
+```c
+if ((error = octopipes_server_start_cap_listener(server)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+  printf("Could not start CAP listener: %s\n", octopipes_server_get_error_desc(error));
+}
+```
+
+Server main loop. This simple loop takes care of:
+
+- CAP:
+  - listening on the CAP inbox for new messages
+  - handling subscription requests
+  - handling unsubscription requests
+- Clients:
+  - Waiting for messages from clients
+  - Dispatching the client messages to the other clients subscribed to the associated remote
+
+```c
+while (true) {
+  //Process CAP
+  size_t requests = 0;
+  if ((error = octopipes_server_process_cap_oncee(server, &requests)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
+    printf("Error while processing CAP: %s\n", octopipes_server_get_error_desc(error));
+  }
+  //Process clients
+  const char* faultClient;
+  if ((error = octopipes_server_process_once(server, &requests, &faultClient)) != octopipes::ServerError::SUCCESS) {
+    printf("Error while processing CLIENT %s: %s\n", faultClient, octopipes_server_get_error_desc(error));
+  }
+  if (requests > 0) {
+    printf("Processed %zu requests\n", requests);
+  }
+  usleep(100000); //100ms
+}
+```
+
+Stop server
+It's enough to delete the server object.
+
+```c
+octopipes_server_cleanup(server);
+```
 
 ## Documentation
 

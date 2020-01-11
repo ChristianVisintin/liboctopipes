@@ -28,11 +28,6 @@ make install
 
 ## Client Implementation
 
-Dependencies:
-
-- pthread
-- liboctopipespp
-
 Initialize the client
 
 ```cpp
@@ -90,7 +85,61 @@ Two clients implementation can be found in and are provided with liboctopipes [H
 
 ## Server Implementation
 
-TBD
+Initialize the server.
+These parameters are required:
+
+- CAP pipe path
+- Directory where the clients pipes will be stored (if doesn't exist, will be created)
+- Protocol version
+
+```cpp
+octopipes::Server* octopipesServer = new octopipes::Server(capPipe, clientDir, octopipes::ProtocolVersion::VERSION_1);
+```
+
+Start the CAP listener (in order to receive message on the CAP)
+
+```cpp
+if ((error = octopipesServer->startCapListener()) != octopipes::ServerError::SUCCESS) {
+  std::cout << "Could not start CAP listener: " << octopipes::Server::getServerErrorDesc(error) << std::endl;
+  goto cleanup;
+}
+```
+
+Server main loop. This simple loop takes care of:
+
+- CAP:
+  - listening on the CAP inbox for new messages
+  - handling subscription requests
+  - handling unsubscription requests
+- Clients:
+  - Waiting for messages from clients
+  - Dispatching the client messages to the other clients subscribed to the associated remote
+
+```cpp
+while (true) {
+  //Process CAP
+  size_t requests = 0;
+  if ((error = octopipesServer->processCapOnce(requests)) != octopipes::ServerError::SUCCESS) {
+    std::cout << "Error while processing CAP: " << octopipes::Server::getServerErrorDesc(error) << std::endl;
+  }
+  //Process clients
+  std::string faultClient;
+  if ((error = octopipesServer->processOnce(requests, faultClient)) != octopipes::ServerError::SUCCESS) {
+    std::cout << "Error while processing CLIENT '" << faultClient << "':" << octopipes::Server::getServerErrorDesc(error) << std::endl;
+  }
+  if (requests > 0) {
+    std::cout << "Processed " << requests << " requests from clients" << std::endl;
+  }
+  usleep(100000); //100ms
+}
+```
+
+Stop server
+It's enough to delete the server object.
+
+```cpp
+delete octopipesServer;
+```
 
 ## Documentation
 

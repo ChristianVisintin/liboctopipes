@@ -30,6 +30,7 @@
 #include <string>
 #include <thread>
 
+#include <unistd.h>
 #include <sys/time.h>
 
 #define PROGRAM_NAME "test_serverpp"
