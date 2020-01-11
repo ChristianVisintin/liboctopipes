@@ -27,6 +27,7 @@
 #include <octopipes/serializer.h>
 
 #include <string.h>
+#include <unistd.h>
 
 #define DEFAULT_TTL 60
 
@@ -224,6 +225,7 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
   }
+  usleep(100000);
   //If packet was sent successfully, then wait for assignment
   uint8_t* in_data;
   size_t in_data_size;
