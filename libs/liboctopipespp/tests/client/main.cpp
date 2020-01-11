@@ -445,7 +445,7 @@ int main(int argc, char** argv) {
 #pragma message("-Warning: test client doesn't run on Windows")
   return 0;
 #else
-  printf(PROGRAM_NAME " liboctopipes Build: " OCTOPIPES_LIB_VERSION "\n");
+  printf(PROGRAM_NAME " liboctopipespp Build: " OCTOPIPES_LIB_VERSION "\n");
   int opt;
   int is_child = 0; //This is for indicating the client type
   while ((opt = getopt(argc, argv, "t:r:c:h")) != -1) {

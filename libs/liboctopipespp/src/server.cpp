@@ -246,7 +246,7 @@ std::list<std::string> Server::getClients() {
  * @return string
  */
 
-const std::string getServerErrorDesc(const ServerError error) {
+const std::string Server::getServerErrorDesc(const ServerError error) {
   switch (error) {
     case ServerError::BAD_ALLOC: 
       return "Could not allocate more memory";

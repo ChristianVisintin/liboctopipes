@@ -29,12 +29,15 @@ file(GLOB PARSER_TEST_SRC
 file(GLOB CLIENT_TEST_SRC
   "${ROOT_TESTS_DIR}/client/*.cpp"
 )
+file(GLOB SERVER_TEST_SRC
+  "${ROOT_TESTS_DIR}/server/*.cpp"
+)
 
 set(CXX_FLAGS "-g -Wall")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -g")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall")
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_BUILD_TYPE DEBUG)
+set(CMAKE_BUILD_TYPE RELEASE)
 
 add_library(octopipespp_shared SHARED ${LIBOCTOPIPESPP_SRC})
 set_target_properties(octopipespp_shared PROPERTIES OUTPUT_NAME octopipespp)
@@ -49,11 +52,15 @@ add_executable(test_parserpp ${PARSER_TEST_SRC})
 target_link_libraries(test_parserpp octopipespp_shared)
 add_executable(test_clientpp ${CLIENT_TEST_SRC})
 target_link_libraries(test_clientpp octopipespp_shared)
+add_executable(test_serverpp ${SERVER_TEST_SRC})
+target_link_libraries(test_serverpp octopipespp_shared)
 if(CMAKE_COMPILER_IS_GNUCXX)
   target_compile_options(test_parserpp PUBLIC "--coverage")
   target_link_libraries(test_parserpp gcov)
   target_compile_options(test_clientpp PUBLIC "--coverage")
   target_link_libraries(test_clientpp gcov)
+  target_compile_options(test_serverpp PUBLIC "--coverage")
+  target_link_libraries(test_serverpp gcov)
 endif()
 #Install rules
 install(TARGETS octopipespp_shared CONFIGURATIONS Release LIBRARY DESTINATION lib PUBLIC_HEADER DESTINATION include)
