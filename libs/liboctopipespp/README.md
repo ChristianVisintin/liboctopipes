@@ -10,6 +10,7 @@ LibOctopipes is a C++ Wrapper of liboctopipes which provides functions to implem
   - [Client Implementation](#client-implementation)
   - [Server Implementation](#server-implementation)
   - [Documentation](#documentation)
+  - [Changelog](#changelog)
   - [License](#license)
 
 ## Build
@@ -145,6 +146,12 @@ delete octopipesServer;
 ## Documentation
 
 TODO
+
+---
+
+## Changelog
+
+---
 
 ## License
 

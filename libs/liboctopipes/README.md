@@ -10,6 +10,7 @@ LibOctopipes is a C library which provides functions to implement Octopipes serv
   - [Client Implementation](#client-implementation)
   - [Server Implementation](#server-implementation)
   - [Documentation](#documentation)
+  - [Changelog](#changelog)
   - [License](#license)
 
 ## Build
@@ -160,6 +161,12 @@ octopipes_server_cleanup(server);
 ## Documentation
 
 TODO
+
+---
+
+## Changelog
+
+---
 
 ## License
 
