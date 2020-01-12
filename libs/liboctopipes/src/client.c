@@ -88,10 +88,7 @@ OctopipesError octopipes_cleanup(OctopipesClient* client) {
   }
   //Disconnect if not disconnected yet
   if (client->state == OCTOPIPES_STATE_SUBSCRIBED || client->state == OCTOPIPES_STATE_RUNNING) {
-    OctopipesError rc;
-    if ((rc = octopipes_unsubscribe(client)) != OCTOPIPES_ERROR_SUCCESS) {
-      return rc;
-    }
+    octopipes_unsubscribe(client);
   }
   free(client->client_id);
   free(client->common_access_pipe);
@@ -163,7 +160,8 @@ OctopipesError octopipes_loop_stop(OctopipesClient* client) {
   //Join thread
   client->state = OCTOPIPES_STATE_STOPPED;
   if (pthread_join(client->loop, NULL) != 0) {
-    client->state = OCTOPIPES_STATE_SUBSCRIBED; //Set state back to SUBSCRIBED
+    client->state = OCTOPIPES_STATE_UNSUBSCRIBED; //Set state back to UNSUBSCRIBED
+    return OCTOPIPES_ERROR_THREAD;
   }
   return OCTOPIPES_ERROR_SUCCESS;
 }
