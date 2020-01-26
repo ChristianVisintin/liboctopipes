@@ -133,7 +133,7 @@ OctopipesError octopipes_decode(const uint8_t* data, const size_t data_size, Oct
       memcpy(message_ptr->data, data + data_ptr, message_ptr->data_size);
     }
     //Verify checksum if required
-    if ((message_ptr->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM) != 0) {
+    if ((message_ptr->options & OCTOPIPES_OPTIONS_IGNORE_CHECKSUM) == 0) {
       uint8_t verification_checksum = calculate_checksum(message_ptr);
       if (verification_checksum != message_ptr->checksum) {
         goto decode_bad_checksum;

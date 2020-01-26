@@ -165,6 +165,7 @@ OctopipesServerError octopipes_server_cleanup(OctopipesServer* server) {
   //Free buffers
   free(server->client_folder);
   free(server->cap_pipe);
+  message_inbox_cleanup(server->cap_inbox);
   //Free server itself
   free(server);
   return OCTOPIPES_SERVER_ERROR_SUCCESS;
@@ -274,6 +275,8 @@ OctopipesServerError octopipes_server_write_cap(OctopipesServer* server, const c
   message->origin = NULL; //None, server has no origin
   message->origin_size = 0;
   message->remote = NULL;
+  message->ttl = 5;
+  message->options = OCTOPIPES_OPTIONS_NONE;
   message->data = (uint8_t*) malloc(sizeof(uint8_t) * data_size);
   if (message->data == NULL) {
     octopipes_cleanup_message(message);
@@ -442,10 +445,10 @@ OctopipesServerError cap_manage_subscription(OctopipesServer* server, const char
     cap_err = OCTOPIPES_CAP_ERROR_NAME_ALREADY_TAKEN;
   }
   if (cap_err != OCTOPIPES_CAP_ERROR_SUCCESS) {
-    if (pipe_rx == NULL) {
+    if (pipe_rx != NULL) {
       free(pipe_rx);
     }
-    if (pipe_tx == NULL) {
+    if (pipe_tx != NULL) {
       free(pipe_tx);
     }
     pipe_rx = NULL;
@@ -456,10 +459,10 @@ OctopipesServerError cap_manage_subscription(OctopipesServer* server, const char
   //Create worker
   OctopipesServerError rc;
   if ((rc = octopipes_server_start_worker(server, client, groups, groups_len, pipe_tx, pipe_rx)) != OCTOPIPES_SERVER_ERROR_SUCCESS) {
-    if (pipe_rx == NULL) {
+    if (pipe_rx != NULL) {
       free(pipe_rx);
     }
-    if (pipe_tx == NULL) {
+    if (pipe_tx != NULL) {
       free(pipe_tx);
     }
     for (size_t i = 0; i < groups_len; i++) {
@@ -483,19 +486,19 @@ OctopipesServerError cap_manage_subscription(OctopipesServer* server, const char
   uint8_t* assignment_payload = NULL;
   size_t assignment_len = 0;
   if ((assignment_payload = octopipes_cap_prepare_assign(cap_err, pipe_tx, pipe_tx_len - 1, pipe_rx, pipe_rx_len - 1, &assignment_len)) == NULL) {
-    if (pipe_rx == NULL) {
+    if (pipe_rx != NULL) {
       free(pipe_rx);
     }
-    if (pipe_tx == NULL) {
+    if (pipe_tx != NULL) {
       free(pipe_tx);
     }
     octopipes_server_stop_worker(server, client);
     return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
   }
-  if (pipe_rx == NULL) {
+  if (pipe_rx != NULL) {
     free(pipe_rx);
   }
-  if (pipe_tx == NULL) {
+  if (pipe_tx != NULL) {
     free(pipe_tx);
   }
   //Send message
@@ -594,9 +597,14 @@ OctopipesServerError octopipes_server_stop_worker(OctopipesServer* server, const
         server->workers[j] = server->workers[j + 1];
       }
       //Reallocate workers
-      server->workers = (OctopipesServerWorker**) realloc(server->workers, sizeof(OctopipesServerWorker*) * server->workers_len);
-      if (server->workers == NULL) {
-        return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+      if (server->workers_len > 0) {
+        server->workers = (OctopipesServerWorker**) realloc(server->workers, sizeof(OctopipesServerWorker*) * server->workers_len);
+        if (server->workers == NULL) {
+          return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+        }
+      } else {
+        free(server->workers);
+        server->workers = NULL;
       }
       //OK
       return OCTOPIPES_SERVER_ERROR_SUCCESS;
@@ -1161,7 +1169,12 @@ OctopipesServerMessage* message_inbox_dequeue(OctopipesServerInbox* inbox) {
     inbox[i] = inbox[i + 1];
   }
   //Reallocate messages
-  inbox->messages = (OctopipesServerMessage**) realloc(inbox->messages, sizeof(OctopipesServerMessage*) * new_inbox_len);
+  if (new_inbox_len > 0) {
+    inbox->messages = (OctopipesServerMessage**) realloc(inbox->messages, sizeof(OctopipesServerMessage*) * new_inbox_len);
+  } else {
+    free(inbox->messages);
+    inbox->messages = NULL;
+  }
   inbox->inbox_len = new_inbox_len;
   return ret;
 }
@@ -1235,9 +1248,14 @@ OctopipesServerError message_inbox_remove(OctopipesServerInbox* inbox, const siz
     inbox[i] = inbox[i + 1];
   }
   //Reallocate messages
-  inbox->messages = (OctopipesServerMessage**) realloc(inbox->messages, sizeof(OctopipesServerMessage*) * new_inbox_len);
-  if (inbox->messages == NULL) {
-    return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+  if (new_inbox_len > 0) {
+    inbox->messages = (OctopipesServerMessage**) realloc(inbox->messages, sizeof(OctopipesServerMessage*) * new_inbox_len);
+    if (inbox->messages == NULL) {
+      return OCTOPIPES_SERVER_ERROR_BAD_ALLOC;
+    }
+  } else {
+    free(inbox->messages);
+    inbox->messages = NULL;
   }
   inbox->inbox_len--;
   return OCTOPIPES_SERVER_ERROR_SUCCESS;

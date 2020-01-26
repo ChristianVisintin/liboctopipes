@@ -231,13 +231,22 @@ OctopipesError octopipes_subscribe(OctopipesClient* client, const char** groups,
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     return rc;
   }
-  OctopipesMessage* cap_message;
+  OctopipesMessage* cap_message = NULL;
   rc = octopipes_decode(in_data, in_data_size, &cap_message);
   if (rc != OCTOPIPES_ERROR_SUCCESS) {
     free(in_data);
     return rc;
   }
   free(in_data);
+  //Verify remote
+  if (cap_message->remote == NULL) {
+    octopipes_cleanup_message(cap_message);
+    return OCTOPIPES_ERROR_BAD_PACKET;
+  }
+  if (strcmp(cap_message->remote, client->client_id) != 0) {
+    octopipes_cleanup_message(cap_message);
+    return OCTOPIPES_ERROR_BAD_PACKET;
+  }
   //Verify packet type
   OctopipesCapMessage message_type = octopipes_cap_get_message(cap_message->data, cap_message->data_size);
   if (message_type != OCTOPIPES_CAP_ASSIGNMENT) { //Return bad packet, the user must redo the operation

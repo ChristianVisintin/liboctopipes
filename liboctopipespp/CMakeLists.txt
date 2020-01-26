@@ -3,7 +3,7 @@ project(liboctopipes VERSION 0.1.0)
 
 set (ROOT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/")
 set (ROOT_TESTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests/")
-set (OCTOPIPES_C_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../liboctopipes/")
+set (OCTOPIPES_C_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../")
 set (OCTOPIPES_C_DIR_BIN "${CMAKE_CURRENT_BINARY_DIR}/liboctopipes/")
 
 add_subdirectory(${OCTOPIPES_C_DIR} ${OCTOPIPES_C_DIR_BIN})

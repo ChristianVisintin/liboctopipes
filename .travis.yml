@@ -1,0 +1,52 @@
+jobs:
+  include:
+    - stage: "liboctopipes-linux"
+      language: c
+      dist: trusty
+      compiler: gcc
+      os: linux
+      before_script:
+        - mkdir build/ && cd build/
+      script:
+        - cmake ..
+        - make
+        - make install DESTDIR=./out/
+        - ./test_parser
+        - ./test_pipes -t /tmp/pipe_tx -r /tmp/pipe_rx
+        - ./test_client -t /tmp/pipe_tx2 -r /tmp/pipe_rx2 -c /tmp/pipe_cap
+    - stage: "liboctopipes-minGW"
+      language: c
+      os: windows
+      compiler: gcc
+      before_script:
+        - mkdir build/
+        - cd build/
+      script:
+        - cmake .. -G "MinGW Makefiles" -DCMAKE_SH="CMAKE_SH-NOTFOUND"
+        - mingw32-make
+        - ./test_parser.exe
+    - stage: "liboctopipespp-linux"
+      language: cpp
+      dist: trusty
+      compiler: g++
+      os: linux
+      before_script:
+        - cd liboctopipespp/ && mkdir build/ && cd build/
+      script:
+        - cmake ..
+        - make
+        - make install DESTDIR=./out/
+        - ./test_parserpp
+        - ./test_clientpp -t /tmp/pipecpp_tx -r /tmp/pipecpp_rx -c /tmp/pipecpp_cap
+        - ./test_serverpp -c /tmp/server_cap -d /tmp/clients/
+    - stage: "liboctopipespp-minGW"
+      language: cpp
+      os: windows
+      compiler: g++
+      before_script:
+        - cd liboctopipespp/
+        - mkdir build/
+        - cd build/
+      script:
+        - cmake .. -G "MinGW Makefiles" -DCMAKE_SH="CMAKE_SH-NOTFOUND"
+        - mingw32-make

@@ -1,12 +1,15 @@
 # LibOctopipes
 
-Current Version: 0.1.0 (??/??/2020)
+[![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](https://opensource.org/licenses/MIT) [![Stars](https://img.shields.io/github/stars/ChristianVisintin/liboctopipes.svg)](https://github.com/ChristianVisintin/liboctopipes) [![Issues](https://img.shields.io/github/issues/ChristianVisintin/liboctopipes.svg)](https://github.com/ChristianVisintin/liboctopipes) [![Build](https://api.travis-ci.org/ChristianVisintin/liboctopipes.svg?branch=master)](https://travis-ci.org/ChristianVisintin/liboctopipes)
+
+Current Version: 0.1.0 (13/01/2020)
 Developed by *Christian Visintin*
 
 LibOctopipes is a C library which provides functions to implement Octopipes server and clients.
 
 - [LibOctopipes](#liboctopipes)
   - [Build](#build)
+  - [C++ Wrapper](#c-wrapper)
   - [Client Implementation](#client-implementation)
   - [Server Implementation](#server-implementation)
   - [Documentation](#documentation)
@@ -89,6 +92,10 @@ cmake ..
 make
 make install
 ```
+
+## C++ Wrapper
+
+A C++14 wrapper is provided along with this library. For more information go [Click here](liboctopipespp/README.md)
 
 ## Client Implementation
 
